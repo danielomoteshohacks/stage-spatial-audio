@@ -13,6 +13,7 @@ dependencies = ["numpy", "scipy", "soundfile"]
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "jsonschema"]
+viz = ["matplotlib"]
 
 [project.urls]
 Homepage = "https://github.com/danielomoteshohacks/stage-spatial-audio"
