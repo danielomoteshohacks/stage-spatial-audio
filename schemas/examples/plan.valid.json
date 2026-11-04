@@ -1,0 +1,14 @@
+{
+  "track_id": "demo-001",
+  "engine": "0.0.1",
+  "style": { "afrobeats": 0.71, "pop": 0.18, "other": 0.11 },
+  "mode": "studio_room",
+  "intensity": 0.6,
+  "stems": [
+    { "name": "vocals_lead", "az": 0, "el": 0, "dist": 1.2, "spread": 0.1, "room_send": 0.15, "orig_blend": 0.35 },
+    { "name": "perc", "az": 70, "el": 0, "dist": 2.0, "spread": 0.5, "room_send": 0.3, "orig_blend": 0.2 },
+    { "name": "bass", "az": 0, "el": 0, "dist": 1.0, "spread": 0.0, "room_send": 0.0, "orig_blend": 0.6, "mono_below_hz": 120 }
+  ],
+  "room": { "rt60_s": 0.45, "predelay_ms": 12 },
+  "protected": ["vocals_lead:centre"]
+}

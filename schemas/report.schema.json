@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/danielomoteshohacks/stage-spatial-audio/schemas/report.schema.json",
+  "title": "Stage quality report",
+  "description": "Output of the fidelity guard for one render.",
+  "type": "object",
+  "required": ["alignment_ms", "downmix_db", "low_end_corr", "loudness_lufs", "true_peak_db", "mono_cancel_db", "verdict", "versions"],
+  "properties": {
+    "alignment_ms": { "type": "number" },
+    "downmix_db": {
+      "type": "object",
+      "description": "Difference after folding the render to stereo, per frequency band.",
+      "additionalProperties": { "type": "number" }
+    },
+    "low_end_corr": { "type": "number", "minimum": -1, "maximum": 1 },
+    "loudness_lufs": {
+      "type": "object",
+      "required": ["original", "render"],
+      "properties": {
+        "original": { "type": "number" },
+        "render": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "timbre_deviation_db": { "type": "number", "minimum": 0 },
+    "true_peak_db": { "type": "number" },
+    "mono_cancel_db": { "type": "number" },
+    "artifact_flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["start_s", "end_s", "kind"],
+        "properties": {
+          "start_s": { "type": "number", "minimum": 0 },
+          "end_s": { "type": "number", "minimum": 0 },
+          "kind": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "verdict": { "enum": ["pass", "fail", "review"] },
+    "reasons": { "type": "array", "items": { "type": "string" } },
+    "versions": { "type": "object", "additionalProperties": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

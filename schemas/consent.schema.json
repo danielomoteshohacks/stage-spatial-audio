@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/danielomoteshohacks/stage-spatial-audio/schemas/consent.schema.json",
+  "title": "Stage consent record",
+  "description": "A rights holder's decision about spatial processing of one track. Default is not opted in.",
+  "type": "object",
+  "required": ["track_id", "opted_in"],
+  "properties": {
+    "track_id": { "type": "string", "minLength": 1 },
+    "opted_in": { "type": "boolean" },
+    "agreement_ref": { "type": "string" },
+    "modes_allowed": { "type": "array", "items": { "type": "string" } },
+    "intensity_cap": { "type": "number", "minimum": 0, "maximum": 1 },
+    "protected": { "type": "array", "items": { "type": "string" } },
+    "approval": { "enum": ["none", "required", "approved"] },
+    "approved_at": { "type": "string", "format": "date-time" },
+    "withdrawn_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "additionalProperties": false
+}
