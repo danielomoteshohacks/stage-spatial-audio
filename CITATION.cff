@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "Stage: pan-anchored spatial audio rendering"
+type: software
+license: Apache-2.0
+repository-code: "https://github.com/danielomoteshohacks/stage-spatial-audio"
+authors:
+  - alias: "danielomoteshohacks"
