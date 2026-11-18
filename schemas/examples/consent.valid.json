@@ -1,0 +1,10 @@
+{
+  "track_id": "demo-001",
+  "opted_in": true,
+  "agreement_ref": "AGR-0001",
+  "modes_allowed": ["studio_room", "cinema"],
+  "intensity_cap": 0.7,
+  "protected": ["vocals_lead:centre"],
+  "approval": "required",
+  "withdrawn_at": null
+}
