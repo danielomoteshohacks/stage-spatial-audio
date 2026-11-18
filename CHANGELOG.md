@@ -8,3 +8,4 @@ All notable changes are recorded here. The format follows
 
 ### Added
 - Repository structure, documentation, decision records, JSON schemas, tests and CI.
+- Lite renderer (`stage.render.render_stereo`) and `scripts/render_clip.py` for headphone A/B clips.
