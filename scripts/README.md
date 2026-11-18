@@ -3,4 +3,7 @@
 Helper scripts: download and verify models and datasets against their manifests, regenerate golden
 files, run the full evaluation.
 
-Status: planned.
+- `analyze_clip.py`: where the stereo analysis finds the primary sound.
+- `render_clip.py`: render an excerpt with the Lite renderer and write an A/B pair of 24-bit WAVs.
+
+Status: the rest (model and dataset download and verification, golden files, full evaluation) is planned.
