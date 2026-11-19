@@ -32,3 +32,6 @@ models/*
 *.pth
 *.ckpt
 *.safetensors
+
+# Blind-test sessions: shuffled renders and their hidden key
+abx/

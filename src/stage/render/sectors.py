@@ -44,21 +44,29 @@ def sector_weights(angle_deg: ArrayLike) -> NDArray[np.float64]:
     return w / w.sum(axis=0, keepdims=True)
 
 
-def widen_azimuth(theta_deg: ArrayLike, beta: float = WIDEN_BETA_MAX) -> NDArray[np.float64]:
-    """Order-preserving widen warp: alpha = 80 * tanh(beta * theta / 80).
+def widen_azimuth(
+    theta_deg: ArrayLike, beta: float = WIDEN_BETA_MAX, limit_deg: float = WIDEN_LIMIT_DEG
+) -> NDArray[np.float64]:
+    """Order-preserving widen warp: alpha = limit * tanh(beta * theta / limit), limit 80 by default.
 
     Odd and strictly increasing, so left stays left and ordering is never swapped; the slope at
-    zero is beta and the output saturates below 80 degrees. Valid for beta in [1.0, 2.4].
+    zero is beta and the output saturates below `limit_deg`. Valid for beta in [1.0, 2.4].
+    A lower limit (the front-arc profile, decision 0007 H11) compresses only the edges: the slope
+    at the centre does not depend on it.
     """
     if not WIDEN_BETA_MIN <= beta <= WIDEN_BETA_MAX:
         raise ValueError(f"beta must be in [{WIDEN_BETA_MIN}, {WIDEN_BETA_MAX}], got {beta}")
+    if not 0.0 < limit_deg <= 90.0:
+        raise ValueError(f"limit_deg must be in (0, 90], got {limit_deg}")
     theta = np.asarray(theta_deg, dtype=np.float64)
-    return WIDEN_LIMIT_DEG * np.tanh(beta * theta / WIDEN_LIMIT_DEG)
+    return limit_deg * np.tanh(beta * theta / limit_deg)
 
 
-def sector_azimuths(beta: float = WIDEN_BETA_MAX) -> NDArray[np.float64]:
+def sector_azimuths(
+    beta: float = WIDEN_BETA_MAX, limit_deg: float = WIDEN_LIMIT_DEG
+) -> NDArray[np.float64]:
     """Rendered azimuth of each of the 13 sectors, shape (13,): the widened centres."""
-    return widen_azimuth(SECTOR_CENTRES_DEG, beta)
+    return widen_azimuth(SECTOR_CENTRES_DEG, beta, limit_deg)
 
 
 def apply_sectors(
