@@ -2,12 +2,16 @@
 
 Usage:
     python scripts/render_clip.py path/to/clip.wav [--start 30] [--seconds 15] [--beta 2.0]
-                                  [--out-dir renders]
+                                  [--out-dir renders] [--guard]
 
 Writes input_stereo.wav (the original excerpt) and input_stage.wav (rendered), both 24-bit.
 The rendered file is loudness-matched to the input's RMS first, because a louder version tends to
 win an A/B test on loudness alone. Use only audio you own or may use, and keep the output out of
 Git (*.wav is ignored).
+
+--guard prints the fidelity-guard report (stage.guard) after rendering. It compares the file that
+is written, after loudness matching and the peak safety, because that is what is listened to; the
+loudness row then shows whether the match held, and the other rows are unaffected by a gain.
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
+from stage.guard import format_report, guard_report
 from stage.io import read_audio, to_stereo
 from stage.render import render_stereo
 
@@ -59,6 +64,7 @@ def main() -> None:
     parser.add_argument("--seconds", type=float, default=15.0, help="length to render")
     parser.add_argument("--beta", type=float, default=2.0, help="widen strength, 1.0 to 2.4")
     parser.add_argument("--out-dir", default="renders", help="folder for the two WAV files")
+    parser.add_argument("--guard", action="store_true", help="print the fidelity-guard report")
     args = parser.parse_args()
 
     audio, sample_rate = read_audio(args.path, start_s=args.start, duration_s=args.seconds)
@@ -90,6 +96,9 @@ def main() -> None:
               f"the input by that much; trim the clip or lower beta for a strict match")
     print(f"render time: {elapsed:.2f} s ({audio.shape[1] / sample_rate / elapsed:.1f}x real time)")
     print(f"wrote {out_dir / 'input_stereo.wav'} and {out_dir / 'input_stage.wav'}")
+    if args.guard:
+        print()
+        print(format_report(guard_report(audio, matched, sample_rate)))
 
 
 if __name__ == "__main__":
