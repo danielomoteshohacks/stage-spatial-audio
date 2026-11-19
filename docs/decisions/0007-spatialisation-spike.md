@@ -231,6 +231,25 @@ it. **The blind listening test (`scripts/make_abx.py`) decides.** This record ma
   - (b) the error of interpolating halfway between grid points is at most 0.5 dB in magnitude and
     0.5 samples in delay.
 
+### H14b. Early reflections without the low-frequency build-up (V4b, V5b). Added after the first run
+
+- **Status:** written after V4 failed P5 and P6 in the first measurement, and **before** V4b was
+  measured. It is a post-hoc hypothesis: weigh its result accordingly.
+- **Observed cause of the V4 failure:** below about 1 / (2 x 4.7 ms), roughly 100 Hz, all 12
+  reflections arrive nearly in phase. They therefore add as amplitudes (12 reflections at about
+  0.3 each sum to about +11 dB), and a pink-noise mix, which has most of its energy there, gains
+  bass. The reflections also arrive from every side and dilute the lateral ILD of hard-panned
+  sources.
+- **Mechanism:**
+  - The reflections pass through a second-order high-pass at 200 Hz, `|H| = 1/sqrt(1 + (fc/f)^4)`.
+    Low-frequency room behaviour is modal, which the image-source model does not represent
+    anyway.
+  - The early send is lowered by 3 dB.
+  - The direct path and the late field are unchanged.
+- **Tag:** SPECULATIVE. This is a mixing practice (high-passing reverb sends), not a citation.
+- **Gates:** the same as V4 and V5 in the proxy table (P2, P5, P6), applied unchanged to V4b and
+  V5b.
+
 ### Rejected or deferred
 
 - **Shoulder echo:** Brown and Duda dropped it after informal tests showed little effect on
