@@ -1,6 +1,6 @@
 # 0007. Spatialisation spike: externalisation and space in the Lite tier
 
-- Status: proposed (research spike; gates below were written before the profiles were implemented)
+- Status: proposed; proxies measured, listening test pending (gates were written before the profiles were implemented)
 - Date: 2026-11-18
 
 ## Context
@@ -293,4 +293,66 @@ the blind test (`scripts/make_abx.py`, results in `experiments/results.csv`) has
 
 ## Results
 
-To be filled in from the test output, without changing the gates above.
+Measured 2026-11-19 on the synthetic signals of `tests/unit/test_spatial_profiles.py`:
+
+- The pink test mix: 6 s, a centred source, sources panned to +15 and -25 degrees, and a
+  decorrelated pair. Fixed seeds.
+- beta 2.0 and 44.1 kHz.
+- Each value is one deterministic measurement, so there is no sampling interval. These are
+  properties of the signal path, not of listeners.
+
+The gates above were not changed. Gates that failed are kept in the tests as strict xfails
+carrying the measured value.
+
+| Profile | P1 dT (dB) | P2 DRR near / mid / far (dB) | P5 worst octave (dB) | P6 raw level (dB) | Edge ILD (dB) | Gates |
+|---|---|---|---|---|---|---|
+| V0 | 0.00 | direct only | 2.45 (4 kHz) | -0.76 | 3.04 | pass, except the P3 expectation (below) |
+| V1 | 0.00 | direct only | 2.44 | -0.76 | 2.83 (93 % of V0) | **pass** |
+| V2 | +2.19 | direct only | 2.96 (8 kHz) | -0.52 | 3.45 | **pass** |
+| V3 | +7.19 | direct only | 3.44 (8 kHz; gate 3.45) | -0.51 | 3.46 | **pass**, timbre by 0.01 dB |
+| V4 | +7.19 | +5.6 / +1.5 / -2.8 | 10.36 | +7.60 | 0.62 | **fail**: P5, P6, near DRR |
+| V5 | +7.19 | +4.6 / +0.6 / -3.8 | 10.88 | +8.49 | 0.47 | **fail**: P2, P5, P6 |
+| V4b (H14b) | +7.19 | +8.7 / +4.6 / +0.2 | 3.00 (8 kHz) | -0.32 | 4.47 | **pass** |
+| V5b (H14b + late) | +7.19 | +7.0 / +2.9 / -1.6 | 4.30 (8 kHz) | +1.40 | 2.02 | **fail**: DRR steps 4.1 and 4.5 (gate 5), timbre |
+
+Other gates:
+
+- **H12a pinna elevation:** pass. The deepest notch between 5 and 14 kHz rises monotonically:
+  9.8, 10.6, 11.3, 12.0, 12.7 and 13.5 kHz at -30 to +45 degrees.
+- **H14 geometry:** pass. 12 reflections; the floor reflection is within 0.5 samples of its
+  closed form. Arrivals run from 4.7 to 22.7 ms for the near source.
+- **H15 late field:** pass on its own.
+  - RT60 (T30) is 0.594 s at 500 Hz, 0.596 s at 1 kHz and 0.496 s at 4 kHz.
+  - Echo density averaged over 100 to 300 ms is 0.95.
+  - Coherence per octave from 125 Hz to 8 kHz is 0.88, 0.96, 0.56, 0.02, 0.03, -0.01 and 0.02,
+    against a target of 0.97, 0.90, 0.62, -0.02, 0.02, 0.02 and 0.02.
+  - Broadband IACC is 0.07.
+  - The late field fails only in combination: the DRR spacing (P2) and the 8 kHz timbre (P5).
+- **H16 near field:** pass. ILD is 1.47 dB at 1 m and 60 degrees, and 0.00 dB at 0 degrees. As
+  predicted, it is inert in Lite, where the near role is the centre. It is left out of "max".
+- **H17 rotation:** pass. A k-step rotation equals a table roll with error at most 1e-12. The
+  halfway interpolation error is at most 0.002 dB (head only) and 0.017 dB (with pinna and
+  steering).
+- **P3, V0 ambient expectation:** fail. Coherence of V0's output on uncorrelated input is 0.64 at
+  125 Hz. The primary path, not the ambient phases, dominates there. This was a wrong expectation
+  on our part, not a regression.
+- **Speed** (Python reference, one laptop, 6 s of audio): about 9x real time for V0, V1 and V3,
+  about 3x for V2 (diffuse-field cache warm-up), and 1.2 to 3x for the room profiles. These are
+  not phone or Rust figures; H8 decides those.
+
+**"max" = V4b:** front-arc limit, pinna, steering, and high-passed early reflections. These are
+the toggles whose gates all passed. The late field and the near field are left out.
+
+### What the numbers do and do not say
+
+- The cues are physically present: front differs from rear by 7.2 dB in Blauert's bands, the
+  elevation notch moves, a room with distance-ordered DRR exists, and the late field has the
+  designed decay and coherence.
+- **None of this shows that a listener hears outside-the-head sound.** The blind test decides.
+- V4 to V4b was a single post-hoc fix (H14b), registered before it was measured.
+- The late field's DRR spacing is about 4 dB per doubling of distance, because the early
+  reflections narrow it. That is above the 2 to 3 dB thresholds of Larsen et al., but below our
+  pre-registered 5 dB. The next attempt (to register before running): lower the early energy for
+  the far role, and shape the late field so it loses less at 8 kHz.
+- V3 passes timbre by 0.01 dB. Any change to the steering or the pinna can flip it, and the
+  test will catch that.
