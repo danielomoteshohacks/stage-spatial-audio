@@ -31,6 +31,8 @@ the primary at 8 kHz, with the 1/sqrt(2) scaling: -2.4 dB for a centred source, 
 degrees, +1.6 dB for a hard-right source (beta 2.0); within 0.1 dB of 0 at 100 Hz. That is a
 timbre change for the fidelity guard to bound, not a level error. Interpolating complex filters of
 neighbouring sectors whose delays differ can cancel a little at high frequencies; not yet measured.
+(Measured in 0009: far-ear notches of 17 to 25 dB halfway between sector centres, at most 2.1 dB
+per 1/3 octave with both ears' power summed.)
 
 ## Alternatives considered
 sqrt(w) with a normalising divisor; blending sector azimuths into one filter per bin (exact, but
