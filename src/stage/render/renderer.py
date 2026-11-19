@@ -20,7 +20,7 @@ filtering at widened centres on top would widen twice.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -28,6 +28,9 @@ from numpy.typing import NDArray
 from stage.analysis import DEFAULT_HOP, DEFAULT_N_FFT, analyse_stereo, istft, stft
 from stage.render.headmodel import sector_filters
 from stage.render.sectors import sector_azimuths, sector_weights
+
+if TYPE_CHECKING:
+    from stage.render.profiles import Profile
 
 #: Seed of the ambient decorrelation phases. Fixed so a render is bit-for-bit repeatable.
 AMBIENT_SEED = 20240611
@@ -98,6 +101,7 @@ def render_stereo(
     beta: float = 2.0,
     block_frames: int = 256,
     *,
+    profile: str | Profile | None = None,
     _split: _SplitMode = _DEFAULT_SPLIT,
 ) -> NDArray[np.float64]:
     """Render stereo audio (2, samples) to binaural stereo (2, samples), float64.
@@ -109,6 +113,9 @@ def render_stereo(
         block_frames: STFT frames handled at a time by the sector stage. Sector weights are 13
             times the size of a spectrogram, so this bounds the memory of the heavy step. The
             result does not depend on it.
+        profile: None (default) is this renderer, unchanged. A name ("V0" to "V5", "max") or a
+            `stage.render.profiles.Profile` renders with the spatialisation-spike cues of
+            decision 0007 instead. "V0" gives exactly the same output as None.
 
     The STFT, the stereo analysis (a causal recursive smoother) and the inverse STFT run on the
     whole signal, because the analysis state would have to be carried across blocks otherwise.
@@ -123,6 +130,12 @@ def render_stereo(
     if block_frames < 1:
         raise ValueError(f"block_frames must be at least 1, got {block_frames}")
     n_samples = audio.shape[1]
+    if profile is not None:
+        sector_azimuths(beta)  # validates beta before the heavier work
+        # Imported here: profiles builds on this module, so a top-level import would be circular.
+        from stage.render.profiles import render_profile
+
+        return render_profile(audio, sample_rate, profile, beta, block_frames, _split)
 
     azimuths = sector_azimuths(beta)  # also validates beta
     filters = _EAR_NORM * sector_filters(
