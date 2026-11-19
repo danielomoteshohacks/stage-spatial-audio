@@ -15,3 +15,4 @@ per experiment using the Experiment template, and store the analysis here.
 | H8 | Lite meets the size and CPU budgets | All budgets met on real devices | not started |
 | H9 | Lossy encoding keeps the spatial effect | Not reliably distinguishable in ABX | not started |
 | H10 | The quality proxy tracks true quality | Rank correlation at least 0.5 | not started |
+| H11 to H17 | Spatialisation spike: front-arc, pinna, directional bands, room, late field, near field, rotation | Objective gates in docs/decisions/0007; blind ranking via `scripts/make_abx.py` ([ABX.md](ABX.md)) | proxies measured, listening not started |
