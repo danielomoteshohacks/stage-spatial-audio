@@ -9,3 +9,6 @@ All notable changes are recorded here. The format follows
 ### Added
 - Repository structure, documentation, decision records, JSON schemas, tests and CI.
 - Lite renderer (`stage.render.render_stereo`) and `scripts/render_clip.py` for headphone A/B clips.
+- Fidelity guard basics (`stage.guard`): alignment, RMS loudness, 1/3-octave timbre deviation and
+  low-end report, `guard_report`, and `scripts/render_clip.py --guard`.
+- `scripts/measure_sector_sum.py` and decision 0009 (comb between neighbouring sectors).
