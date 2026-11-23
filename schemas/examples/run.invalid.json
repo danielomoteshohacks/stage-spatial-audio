@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "app": "SoundStage",
+  "stage_version": "0.0.1",
+  "created_utc": "2026-11-23T10:00:00Z",
+  "input": { "name": "track.flac", "start_s": 0, "requested_seconds": null },
+  "requested_mode": "stems",
+  "mode": "stems",
+  "profile": "max",
+  "beta": 3.5,
+  "fallback": null,
+  "separation": null,
+  "levels": null,
+  "stages": [
+    { "name": "load", "status": "running", "duration_s": 0.02, "error": null }
+  ],
+  "outputs": { "spatial": "spatial.wav" },
+  "ok": true
+}

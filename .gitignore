@@ -35,5 +35,8 @@ models/*
 
 # Blind-test sessions: shuffled renders and their hidden key
 abx/
+# Pipeline runs: processed audio and run reports
+runs/
 CLAUDE.md
 .claude/
+space-bundle/

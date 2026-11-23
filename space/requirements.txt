@@ -1,0 +1,9 @@
+# Installed by Hugging Face on the Space's servers, not on a laptop (there, use the extras in
+# pyproject.toml). gradio is pinned to the version the endpoint was tested with; the README's
+# sdk_version must match it.
+gradio==6.32.0
+numpy
+scipy
+soundfile
+torch
+demucs

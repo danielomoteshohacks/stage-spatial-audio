@@ -10,20 +10,20 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMAS = ROOT / "schemas"
 
 
-@pytest.mark.parametrize("name", ["plan", "report", "consent"])
+@pytest.mark.parametrize("name", ["plan", "report", "consent", "run"])
 def test_schema_is_valid(name):
     schema = json.loads((SCHEMAS / f"{name}.schema.json").read_text())
     Draft202012Validator.check_schema(schema)
 
 
-@pytest.mark.parametrize("name", ["plan", "report", "consent"])
+@pytest.mark.parametrize("name", ["plan", "report", "consent", "run"])
 def test_valid_example_passes(name):
     schema = json.loads((SCHEMAS / f"{name}.schema.json").read_text())
     example = json.loads((SCHEMAS / "examples" / f"{name}.valid.json").read_text())
     Draft202012Validator(schema).validate(example)
 
 
-@pytest.mark.parametrize("name", ["plan", "report", "consent"])
+@pytest.mark.parametrize("name", ["plan", "report", "consent", "run"])
 def test_invalid_example_is_rejected(name):
     schema = json.loads((SCHEMAS / f"{name}.schema.json").read_text())
     example = json.loads((SCHEMAS / "examples" / f"{name}.invalid.json").read_text())

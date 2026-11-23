@@ -7,3 +7,4 @@
 | [`roadmap.md`](roadmap.md) | The five vertical slices and their exit conditions |
 | [`decisions/`](decisions/) | Architecture decision records: what was decided, why, and what else was considered |
 | [`research/`](research/) | Notes, sources and experiment write-ups |
+| [`log.md`](log.md) | The build log: what was done, measured, what went wrong, and what is next |

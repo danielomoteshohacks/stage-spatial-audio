@@ -19,33 +19,10 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
+# PEAK_CEILING stays importable from here: callers and tests read it as render_clip.PEAK_CEILING.
+from stage.guard.levels import PEAK_CEILING, limit_peak, match_rms, rms  # noqa: F401
 from stage.io import read_audio, to_stereo
 from stage.render import render_stereo
-
-#: Peak ceiling for the written files, about -0.2 dBFS. Leaves room for the 24-bit rounding and
-#: for players that resample.
-PEAK_CEILING = 0.98
-
-
-def rms(x: np.ndarray) -> float:
-    """RMS over all channels and samples."""
-    return float(np.sqrt(np.mean(np.square(x))))
-
-
-def match_rms(x: np.ndarray, target_rms: float) -> np.ndarray:
-    """Scale `x` to `target_rms`. Silence is returned unchanged."""
-    current = rms(x)
-    return x if current == 0.0 else x * (target_rms / current)
-
-
-def limit_peak(x: np.ndarray, ceiling: float = PEAK_CEILING) -> tuple[np.ndarray, float]:
-    """Scale the whole signal down if its peak exceeds `ceiling`; return it and the gain used.
-
-    A plain gain change (not a clipper or compressor) so the sound is not altered, only quieter.
-    """
-    peak = float(np.max(np.abs(x))) if x.size else 0.0
-    gain = 1.0 if peak <= ceiling else ceiling / peak
-    return x * gain, gain
 
 
 def _db(ratio: float) -> float:

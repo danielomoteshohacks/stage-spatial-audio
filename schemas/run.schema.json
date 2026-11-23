@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/danielomoteshohacks/stage-spatial-audio/schemas/run.schema.json",
+  "title": "SoundStage run report",
+  "description": "Written as run.json by stage.pipeline.run for every processed track: what was asked, what ran, how long each stage took, and which files were written.",
+  "type": "object",
+  "required": ["schema_version", "app", "stage_version", "created_utc", "input", "requested_mode", "mode", "profile", "beta", "fallback", "separation", "levels", "stages", "outputs", "ok"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "app": { "const": "SoundStage" },
+    "stage_version": { "type": "string" },
+    "created_utc": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+    "input": {
+      "type": "object",
+      "required": ["name", "start_s", "requested_seconds"],
+      "properties": {
+        "name": { "type": "string" },
+        "start_s": { "type": "number", "minimum": 0 },
+        "requested_seconds": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "sample_rate": { "type": "integer", "minimum": 1 },
+        "channels": { "type": "integer", "minimum": 1 },
+        "duration_s": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "requested_mode": { "enum": ["lite", "stems"] },
+    "mode": { "enum": ["lite", "stems"] },
+    "profile": { "type": "string" },
+    "beta": { "type": "number", "minimum": 1.0, "maximum": 2.4 },
+    "fallback": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["from", "to", "reason"],
+          "properties": {
+            "from": { "const": "stems" },
+            "to": { "const": "lite" },
+            "reason": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "separation": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["model", "device", "stems", "residual_snr_db", "residual_is_zero", "notes"],
+          "properties": {
+            "model": { "type": "string" },
+            "device": { "type": "string" },
+            "stems": {
+              "type": "array",
+              "items": { "enum": ["vocals", "drums", "bass", "other"] },
+              "minItems": 4,
+              "maxItems": 4,
+              "uniqueItems": true
+            },
+            "residual_snr_db": { "type": ["number", "null"] },
+            "residual_is_zero": { "type": "boolean" },
+            "notes": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "levels": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["original_rms_dbfs", "spatial_raw_rms_dbfs", "spatial_rms_dbfs", "peak_gain_db", "peak_limited"],
+          "properties": {
+            "original_rms_dbfs": { "type": ["number", "null"] },
+            "spatial_raw_rms_dbfs": { "type": ["number", "null"] },
+            "spatial_rms_dbfs": { "type": ["number", "null"] },
+            "peak_gain_db": { "type": "number", "maximum": 0 },
+            "peak_limited": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "duration_s", "error"],
+        "properties": {
+          "name": { "enum": ["load", "separate", "render", "levels", "write"] },
+          "status": { "enum": ["ok", "failed", "skipped"] },
+          "duration_s": { "type": "number", "minimum": 0 },
+          "error": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "properties": {
+        "run": { "const": "run.json" },
+        "original": { "const": "original.flac" },
+        "spatial": { "const": "spatial.flac" },
+        "stems": { "$ref": "#/$defs/stem_files" },
+        "stems_spatial": { "$ref": "#/$defs/stem_files" }
+      },
+      "additionalProperties": false
+    },
+    "ok": { "type": "boolean" },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "stem_files": {
+      "type": "object",
+      "required": ["vocals", "drums", "bass", "other"],
+      "properties": {
+        "vocals": { "type": "string", "pattern": "\\.flac$" },
+        "drums": { "type": "string", "pattern": "\\.flac$" },
+        "bass": { "type": "string", "pattern": "\\.flac$" },
+        "other": { "type": "string", "pattern": "\\.flac$" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
