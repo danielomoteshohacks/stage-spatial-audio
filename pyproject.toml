@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stage-spatial-audio"
 version = "0.0.1"
-description = "Stage: a spatial audio engine that lives inside the music app (any song, any phone, artist in control)."
+description = "SoundStage: a spatial audio engine that lives inside the music app (any song, any phone, artist in control)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
