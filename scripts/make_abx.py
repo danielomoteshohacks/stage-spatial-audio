@@ -27,11 +27,12 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
+# PEAK_CEILING stays importable from here: callers and tests read it as make_abx.PEAK_CEILING.
+from stage.guard.levels import PEAK_CEILING, match_rms, peak_gain, rms  # noqa: F401
 from stage.io import read_audio, to_stereo
 from stage.render import render_stereo
 
 DEFAULT_PROFILES = ("V0", "V1", "V2", "V3", "V4", "V5")
-PEAK_CEILING = 0.98
 RESULTS_CSV = Path(__file__).resolve().parents[1] / "experiments" / "results.csv"
 CSV_FIELDS = (
     "timestamp_utc", "session_id", "clip_sha256", "clip_start_s", "clip_seconds", "beta",
@@ -40,19 +41,14 @@ CSV_FIELDS = (
 )
 
 
-def rms(x: np.ndarray) -> float:
-    return float(np.sqrt(np.mean(np.square(x))))
-
-
 def equalise(renders: dict[str, np.ndarray], target_rms: float) -> dict[str, np.ndarray]:
     """Match every render to `target_rms`, then apply one common peak-safety gain to all.
 
     One shared gain (not one per file) keeps them at equal loudness: a louder version tends to
     win a comparison on loudness alone.
     """
-    matched = {k: v * (target_rms / rms(v)) if rms(v) > 0 else v for k, v in renders.items()}
-    peak = max(float(np.max(np.abs(v))) for v in matched.values())
-    gain = 1.0 if peak <= PEAK_CEILING else PEAK_CEILING / peak
+    matched = {k: match_rms(v, target_rms) for k, v in renders.items()}
+    gain = peak_gain(max(float(np.max(np.abs(v))) for v in matched.values()))
     return {k: v * gain for k, v in matched.items()}
 
 
