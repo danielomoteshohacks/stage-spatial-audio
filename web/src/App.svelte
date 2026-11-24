@@ -390,19 +390,6 @@
     <p class="muted lede">Drop a song you own. SoundStage builds a stage around you from its own parts, keeps the vocal and the bass where the artist put them, and checks the result against the original.</p>
   </section>
 
-  {#if status === "offline" && diagnosis}
-    <section class="notice glass" role="alert">
-      <Icon name="alert" />
-      <div>
-        <p><strong>{diagnosis.title}</strong></p>
-        <p class="muted small">{diagnosis.detail}</p>
-        <ul class="small">
-          {#each diagnosis.fixes as f (f)}<li>{f}</li>{/each}
-        </ul>
-        <button class="btn" type="button" onclick={check}><Icon name="refresh" size={16} /> Check again</button>
-      </div>
-    </section>
-  {/if}
 
   {#if busy}
     <ProgressPanel phase={phase === "idle" ? "processing" : phase} {upload} {stages} oncancel={() => abort?.abort()} />
@@ -418,6 +405,20 @@
     </div>
   {/if}
 
+  <!-- Below the drop zone, so the page does not jump when the server turns out to be asleep. -->
+  {#if status === "offline" && diagnosis}
+    <section class="notice glass" role="alert">
+      <Icon name="alert" />
+      <div>
+        <p><strong>{diagnosis.title}</strong></p>
+        <p class="muted small">{diagnosis.detail}</p>
+        <ul class="small">
+          {#each diagnosis.fixes as f (f)}<li>{f}</li>{/each}
+        </ul>
+        <button class="btn" type="button" onclick={check}><Icon name="refresh" size={16} /> Check again</button>
+      </div>
+    </section>
+  {/if}
   {#if error}
     <p class="error" role="alert"><Icon name="alert" size={18} /> {error}</p>
   {/if}
