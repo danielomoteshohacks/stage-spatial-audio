@@ -42,6 +42,48 @@ export function widthLabel(beta: number): string {
   return "Widest";
 }
 
+export const SPACES = ["studio", "living_room", "car", "club", "concert_hall", "cinema"] as const;
+export type SpaceName = (typeof SPACES)[number];
+
+export const SPACE_INFO: Record<SpaceName, ProfileInfo> = {
+  studio: { label: "Studio", detail: "A treated control room: close, dry and exact" },
+  living_room: { label: "Living room", detail: "A furnished room at home, warm and near" },
+  car: { label: "Car", detail: "A small cabin with close glass" },
+  club: { label: "Club", detail: "A treated room with about a second of reverb" },
+  concert_hall: { label: "Concert hall", detail: "Two seconds of hall around and above you" },
+  cinema: { label: "Cinema", detail: "A big room with a short, even decay" },
+};
+
+export const CHARACTERS = ["intimate", "balanced", "immersive"] as const;
+export type Character = (typeof CHARACTERS)[number];
+
+export const CHARACTER_INFO: Record<Character, ProfileInfo> = {
+  intimate: { label: "Intimate", detail: "Less room, a closer stage" },
+  balanced: { label: "Balanced", detail: "The genre's scene as written" },
+  immersive: { label: "Immersive", detail: "More room and more height around you" },
+};
+
+export const GENRES: { id: string; label: string }[] = [
+  { id: "auto", label: "Detect" },
+  { id: "afrobeats", label: "Afrobeats" },
+  { id: "amapiano", label: "Amapiano" },
+  { id: "hiphop", label: "Hip-hop and rap" },
+  { id: "rnb", label: "R&B and soul" },
+  { id: "gospel", label: "Gospel and choir" },
+  { id: "house", label: "House and EDM" },
+  { id: "pop", label: "Pop" },
+  { id: "rock", label: "Rock" },
+  { id: "acoustic", label: "Acoustic" },
+  { id: "classical", label: "Classical" },
+];
+
+export function motionLabel(m: number): string {
+  if (m <= 0.01) return "Still";
+  if (m < 0.35) return "Subtle";
+  if (m < 0.7) return "Moving";
+  return "Full motion";
+}
+
 export const MODE_INFO: Record<string, ProfileInfo> = {
   lite: { label: "Lite", detail: "Spatialises the whole mix. Fast, runs on a CPU." },
   stems: {
@@ -53,6 +95,7 @@ export const MODE_INFO: Record<string, ProfileInfo> = {
 export const STAGE_LABELS: Record<string, string> = {
   load: "Reading the track",
   separate: "Separating stems",
+  analyse: "Reading the music",
   render: "Rendering the stage",
   levels: "Matching loudness",
   guard: "Checking fidelity",

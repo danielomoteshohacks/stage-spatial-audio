@@ -81,5 +81,9 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
-      - name: Size budget (first load at most 500 KB gzipped)
+      - name: Size budget (first load at most 250 KB gzipped, fonts included)
         run: npm run size
+      - name: Lighthouse, mobile (performance and accessibility at least 90)
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: npm run lighthouse

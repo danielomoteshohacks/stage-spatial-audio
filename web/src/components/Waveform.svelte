@@ -53,14 +53,14 @@
     if (region && duration) {
       const x0 = (Math.min(region.a, region.b) / duration) * width;
       const x1 = (Math.max(region.a, region.b) / duration) * width;
-      g.fillStyle = "rgba(245, 184, 61, 0.13)";
+      g.fillStyle = "rgba(255, 122, 92, 0.14)";
       g.fillRect(x0, 0, x1 - x0, height);
-      g.fillStyle = css("--accent");
+      g.fillStyle = css("--coral");
       g.fillRect(x0, 0, 2, height);
       g.fillRect(x1 - 2, 0, 2, height);
     }
     const mid = height / 2;
-    const dim = "rgba(255, 255, 255, 0.26)";
+    const dim = "rgba(244, 241, 234, 0.22)";
     const accent = css("--accent");
     for (let i = 0; i < peaks.length; i++) {
       const x = i * (BAR + GAP);
@@ -68,7 +68,7 @@
       g.fillStyle = x < played ? accent : dim;
       g.fillRect(x, mid - h / 2, BAR, h);
     }
-    g.fillStyle = css("--text");
+    g.fillStyle = css("--ivory");
     g.fillRect(Math.min(width - 2, Math.max(0, played - 1)), 0, 2, height);
   }
 

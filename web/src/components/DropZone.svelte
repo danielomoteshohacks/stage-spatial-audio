@@ -1,153 +1,92 @@
 <script lang="ts">
-  import { formatBytes, formatTime } from "../lib/format";
+  // Drop a file or tap to choose one. Only the file's name and tags are read here; the audio is
+  // sent to the server when the render starts.
+  import { ALLOWED } from "../lib/format";
   import Icon from "./Icon.svelte";
 
-  const ACCEPT = ".wav,.flac,.mp3,.ogg,.m4a,audio/wav,audio/flac,audio/mpeg,audio/ogg,audio/mp4,audio/x-m4a";
-  const ALLOWED = [".wav", ".flac", ".mp3", ".ogg", ".m4a"];
-
-  let {
-    file,
-    duration,
-    disabled = false,
-    onfile,
-  }: {
-    file: File | null;
-    duration: number | null;
-    disabled?: boolean;
-    onfile: (file: File) => void;
-  } = $props();
-
-  let input: HTMLInputElement | undefined = $state();
+  let { disabled = false, onfile }: { disabled?: boolean; onfile: (f: File) => void } = $props();
   let over = $state(false);
-  let error = $state("");
+  let input: HTMLInputElement | undefined = $state();
+  let refused = $state("");
 
-  function accept(f: File | undefined | null) {
+  function take(f: File | undefined | null) {
     if (!f) return;
     const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
     if (!ALLOWED.includes(ext)) {
-      error = `${f.name} is not a supported type. Use wav, flac, mp3, ogg or m4a.`;
+      refused = `${f.name} is not a file SoundStage can read. Choose wav, flac, mp3, ogg or m4a.`;
       return;
     }
-    error = "";
+    refused = "";
     onfile(f);
-  }
-
-  function drop(e: DragEvent) {
-    e.preventDefault();
-    over = false;
-    if (!disabled) accept(e.dataTransfer?.files?.[0]);
   }
 </script>
 
-<div
-  class="zone"
+<button
+  type="button"
+  class="drop glass"
   class:over
-  class:has-file={!!file}
-  role="presentation"
+  {disabled}
+  onclick={() => input?.click()}
   ondragover={(e) => {
     e.preventDefault();
-    if (!disabled) over = true;
+    over = true;
   }}
   ondragleave={() => (over = false)}
-  ondrop={drop}
+  ondrop={(e) => {
+    e.preventDefault();
+    over = false;
+    take(e.dataTransfer?.files?.[0]);
+  }}
 >
-  <input
-    bind:this={input}
-    id="track-input"
-    class="sr-only"
-    type="file"
-    accept={ACCEPT}
-    {disabled}
-    onchange={(e) => accept((e.currentTarget as HTMLInputElement).files?.[0])}
-  />
-  {#if file}
-    <div class="file">
-      <span class="art" aria-hidden="true"><Icon name="music" size={22} /></span>
-      <div class="meta">
-        <p class="name">{file.name}</p>
-        <p class="faint">{formatBytes(file.size)}{duration ? ` · ${formatTime(duration)}` : ""}</p>
-      </div>
-      <button type="button" class="btn btn-sm" {disabled} onclick={() => input?.click()}>Change</button>
-    </div>
-  {:else}
-    <button type="button" class="pick" {disabled} onclick={() => input?.click()} aria-describedby="drop-help">
-      <span class="badge" aria-hidden="true"><Icon name="upload" size={26} /></span>
-      <span class="big">Drop a track or choose a file</span>
-      <span id="drop-help" class="faint">wav, flac, mp3, ogg or m4a, up to 12 minutes</span>
-    </button>
-  {/if}
-</div>
-{#if error}<p class="err" role="alert">{error}</p>{/if}
+  <span class="ring" aria-hidden="true"><Icon name="upload" size={26} /></span>
+  <span class="title">Drop a song</span>
+  <span class="faint">or tap to choose one: wav, flac, mp3, ogg or m4a, up to 12 minutes</span>
+</button>
+<input bind:this={input} class="sr-only" type="file" accept=".wav,.flac,.mp3,.ogg,.m4a,audio/*" tabindex="-1" aria-hidden="true"
+  onchange={(e) => take((e.currentTarget as HTMLInputElement).files?.[0])} />
+{#if refused}<p class="refused" role="alert">{refused}</p>{/if}
 
 <style>
-  .zone {
-    border: 1.5px dashed var(--line-strong);
-    border-radius: var(--radius);
-    background: var(--bg);
-    transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
-  }
-  .zone.over {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-  }
-  .zone.has-file {
-    border-style: solid;
-    border-color: var(--line);
-  }
-  .pick {
+  .drop {
     width: 100%;
     display: grid;
     justify-items: center;
-    gap: 8px;
-    padding: 36px 16px;
-    border: 0;
-    background: transparent;
-    border-radius: var(--radius);
+    gap: var(--gap-2);
+    padding: var(--gap-6) var(--gap-5);
+    cursor: pointer;
     text-align: center;
+    border-style: dashed;
+    transition: border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
   }
-  .badge {
-    display: grid;
-    place-items: center;
+
+  .drop.over {
+    border-color: var(--lagoon);
+    transform: scale(1.01);
+  }
+
+  .ring {
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: var(--accent-soft);
-    color: var(--accent);
-    margin-bottom: 4px;
-  }
-  .big {
-    font-size: 17px;
-    font-weight: 700;
-  }
-  .file {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 14px;
-  }
-  .art {
-    flex: none;
     display: grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #3a2a0b, #1d1d24);
-    color: var(--accent);
+    background: rgb(31 200 180 / 0.12);
+    color: var(--lagoon);
+    box-shadow: 0 0 0 10px rgb(31 200 180 / 0.05);
   }
-  .meta {
-    flex: 1;
-    min-width: 0;
+
+  .title {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
   }
-  .name {
-    font-weight: 700;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+
+  .faint {
+    font-size: var(--text-sm);
   }
-  .err {
-    margin-top: 8px;
-    color: var(--danger);
-    font-size: 14px;
+
+  .refused {
+    margin-top: var(--gap-2);
+    color: var(--coral);
+    font-size: var(--text-sm);
   }
 </style>

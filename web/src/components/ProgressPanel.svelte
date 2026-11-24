@@ -1,4 +1,5 @@
 <script lang="ts">
+  // Live progress: the upload, then one row per backend stage as the stream reports it.
   import type { StageState } from "../lib/api";
   import { formatDuration } from "../lib/format";
   import { STAGE_LABELS } from "../lib/labels";
@@ -8,158 +9,148 @@
     phase,
     upload,
     stages,
-    mode,
     oncancel,
   }: {
     phase: "uploading" | "processing" | "downloading";
     upload: number;
     stages: StageState[];
-    mode: string;
     oncancel: () => void;
   } = $props();
 
-  let visible = $derived(stages.filter((s) => mode === "stems" || s.stage !== "separate" || s.status !== "pending"));
   let current = $derived(
     phase === "uploading"
       ? `Uploading, ${Math.round(upload * 100)} percent`
       : phase === "downloading"
-        ? "Downloading the renders"
-        : (STAGE_LABELS[stages.find((s) => s.status === "running")?.stage ?? ""] ?? "Waiting in the queue"),
+        ? "Bringing the renders to your phone"
+        : (STAGE_LABELS[stages.find((s) => s.status === "running")?.stage ?? ""] ?? "Waiting for the server"),
   );
 </script>
 
-<section class="card progress rise" aria-labelledby="progress-title">
+<section class="progress glass" aria-labelledby="progress-title">
   <div class="head">
     <div>
-      <p class="eyebrow">Working</p>
-      <h2 id="progress-title" class="section-title" aria-live="polite">{current}</h2>
+      <p class="eyebrow">Building your stage</p>
+      <h2 id="progress-title" aria-live="polite">{current}</h2>
     </div>
-    <button type="button" class="btn btn-sm" onclick={oncancel}>Cancel</button>
+    <button type="button" class="btn" onclick={oncancel}>Cancel</button>
   </div>
-
-  <ol class="steps">
+  <ol>
     <li class:done={phase !== "uploading"} class:active={phase === "uploading"}>
-      <span class="dot">
-        {#if phase === "uploading"}<span class="spinner"></span>{:else}<Icon name="check" size={14} />{/if}
-      </span>
-      <span class="label">Uploading</span>
-      <span class="time">
-        {#if phase === "uploading"}
-          <span class="bar" aria-hidden="true"><span style:width={`${upload * 100}%`}></span></span>
-        {/if}
-      </span>
+      <span class="dot">{#if phase === "uploading"}<span class="spin"></span>{:else}<Icon name="check" size={14} />{/if}</span>
+      <span>Uploading</span>
+      <span class="time">{#if phase === "uploading"}<span class="bar"><span style:width={`${upload * 100}%`}></span></span>{/if}</span>
     </li>
-    {#each visible as s (s.stage)}
+    {#each stages.filter((s) => s.status !== "skipped" || s.stage !== "separate") as s (s.stage)}
       <li class:done={s.status === "ok"} class:active={s.status === "running"} class:failed={s.status === "failed"} class:skipped={s.status === "skipped"}>
         <span class="dot">
-          {#if s.status === "running"}<span class="spinner"></span>
+          {#if s.status === "running"}<span class="spin"></span>
           {:else if s.status === "ok"}<Icon name="check" size={14} />
-          {:else if s.status === "failed"}<Icon name="x" size={14} />
-          {:else if s.status === "skipped"}<Icon name="dash" size={14} />{/if}
+          {:else if s.status === "failed"}<Icon name="close" size={14} />
+          {:else if s.status === "skipped"}<Icon name="minus" size={14} />{/if}
         </span>
-        <span class="label">
-          {STAGE_LABELS[s.stage] ?? s.stage}
-          {#if s.status === "failed" && s.error}<span class="error">{s.error}</span>{/if}
-        </span>
-        <span class="time">{s.status === "ok" || s.status === "failed" ? formatDuration(s.duration_s) : s.status === "skipped" ? "skipped" : ""}</span>
+        <span>{STAGE_LABELS[s.stage] ?? s.stage}{#if s.status === "failed" && s.error}<span class="err">{s.error}</span>{/if}</span>
+        <span class="time">{s.status === "ok" ? formatDuration(s.duration_s) : ""}</span>
       </li>
     {/each}
-    <li class:active={phase === "downloading"}>
-      <span class="dot">{#if phase === "downloading"}<span class="spinner"></span>{/if}</span>
-      <span class="label">Loading into the player</span>
-      <span class="time"></span>
-    </li>
   </ol>
 </section>
 
 <style>
   .progress {
+    padding: var(--gap-5);
     display: grid;
-    gap: 18px;
+    gap: var(--gap-4);
   }
+
   .head {
     display: flex;
-    align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--gap-4);
+    align-items: flex-start;
   }
-  .steps {
+
+  h2 {
+    font-size: var(--text-xl);
+  }
+
+  ol {
     list-style: none;
     margin: 0;
     padding: 0;
     display: grid;
     gap: 2px;
   }
+
   li {
     display: grid;
     grid-template-columns: 28px 1fr auto;
     align-items: center;
-    gap: 12px;
-    min-height: 44px;
-    color: var(--text-3);
+    gap: var(--gap-3);
+    min-height: 36px;
+    color: var(--ivory-3);
+    font-size: var(--text-sm);
   }
-  li.active,
-  li.done {
-    color: var(--text);
+
+  li.done,
+  li.active {
+    color: var(--ivory);
   }
+
   li.failed {
-    color: var(--danger);
+    color: var(--coral);
   }
+
   .dot {
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 1.5px solid var(--line-strong);
-  }
-  li.done .dot {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--accent-ink);
-  }
-  li.failed .dot {
-    border-color: var(--danger);
-  }
-  li.active .dot {
-    border-color: transparent;
-  }
-  .spinner {
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    border: 2px solid var(--surface-3);
-    border-top-color: var(--accent);
+    display: grid;
+    place-items: center;
+    background: rgb(244 241 234 / 0.06);
+  }
+
+  li.done .dot {
+    background: var(--lagoon);
+    color: var(--accent-ink);
+  }
+
+  .spin {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid rgb(244 241 234 / 0.2);
+    border-top-color: var(--lagoon);
     animation: spin 0.9s linear infinite;
   }
-  .label {
-    display: grid;
-    font-weight: 600;
-    font-size: 15px;
+
+  .err {
+    display: block;
+    font-size: var(--text-xs);
   }
-  .error {
-    font-weight: 400;
-    font-size: 13px;
-    color: var(--text-2);
-    word-break: break-word;
-  }
+
   .time {
-    font-family: var(--mono);
-    font-size: 13px;
-    color: var(--text-3);
+    font-size: var(--text-xs);
+    color: var(--ivory-3);
   }
+
   .bar {
     display: block;
     width: 72px;
     height: 4px;
-    border-radius: 2px;
-    background: var(--surface-3);
+    border-radius: 4px;
+    background: rgb(244 241 234 / 0.12);
     overflow: hidden;
   }
+
   .bar span {
     display: block;
     height: 100%;
-    background: var(--accent);
-    transition: width 120ms linear;
+    background: var(--lagoon);
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>

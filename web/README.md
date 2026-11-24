@@ -1,25 +1,24 @@
 # web
 
-The SoundStage listening bench: drop a track, hear the original and the spatial render in perfect
-sync, and tune the spatializer and separator by ear. Svelte 5, Vite and TypeScript, mobile first.
-
-It talks to the Python backend in [`../space/`](../space/) (a laptop or a Hugging Face Space).
-Nothing is processed in the browser yet; the Rust/WebAssembly real-time path is slice 4.
+SoundStage in the browser: drop a song, watch it being built, then listen to the original and the
+spatial render in perfect sync, move the parts around you, and keep renders on your phone.
+Svelte 5, Vite and TypeScript, mobile first (designed at 412 CSS px, a Galaxy S21 FE). The brand is
+documented in [`BRAND.md`](BRAND.md); the product decisions in
+[decision 0020](../docs/decisions/0020-product.md).
 
 ## What it does
 
-- Drop zone and file picker (wav, flac, mp3, ogg, m4a), with an excerpt picker (start and length).
-- Mode (Lite or Stems), character (the render profile, in plain words), and width (beta), with an
-  Advanced drawer that shows the technical names. The profile list is read from the backend.
-- Live stage-by-stage progress streamed from the backend's `/process` endpoint.
-- A sample-locked A/B player: the original, the spatial render and the spatial stems are decoded
-  into AudioBuffers and started at the same AudioContext time; the Original/Spatial switch moves
-  two gains with a 30 ms crossfade, so it never restarts. Space switches, K plays or pauses.
-- A waveform with a seekable playhead and a drag-to-loop region, plus `[` and `]` for loop points.
-- Stems mode: solo and mute per spatial stem, mixed live, and "Use full spatial render".
-- A run report: stage timings, the Lite fallback note when separation could not run, residual SNR,
-  levels and the profile used.
-- A backend setting saved in this browser, and a specific fix when the backend cannot be reached.
+- Home: drop zone, quick (no separation) option, the space, and renders kept on this device
+  (IndexedDB) so replaying one never downloads anything.
+- Now Playing: cover art read from the file's own tags with colours taken from it, the
+  Original/Spatial switch (sample-locked, 30 ms cross-fade), waveform with seek and loop,
+  Space, Character, Motion and Genre applied through `/rerender` (no upload), solo and mute
+  per part, the fidelity guard's verdict, downloads.
+- The stage view (loaded on demand): every part around your head, moving with the music;
+  drag one, raise it, re-render.
+- Feel: vibration on the kick (Android); Media Session controls; installable (PWA); keyboard:
+  Space, S, arrows, [ and ], L.
+- Blind test (loaded on demand): A/B/C in random order, loudness-matched, CSV export.
 
 ## Develop
 
@@ -49,7 +48,8 @@ npm run check   # svelte-check and TypeScript, warnings fail
 npm run lint    # ESLint
 npm test        # unit tests (Vitest) for the API client, player maths, labels and settings
 npm run build   # production build into dist/
-npm run size    # fails if the first load is over 500 KB gzipped
+npm run size    # fails if the first load (fonts included) is over 250 KB gzipped
+npm run lighthouse  # mobile Lighthouse; fails under 0.9 for performance or accessibility
 ```
 
 ## Configuration

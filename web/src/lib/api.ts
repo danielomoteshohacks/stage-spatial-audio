@@ -53,6 +53,16 @@ export interface RunReport {
   ok: boolean;
 }
 
+export interface GuardReport {
+  verdict: "pass" | "review" | "fail";
+  reasons: string[];
+  loudness_lufs: { original: number; render: number };
+  timbre_deviation_db?: number;
+  low_end_corr: number;
+  artifact_flags?: { kind: string; start_s: number; end_s: number; detail?: string }[];
+  [key: string]: unknown;
+}
+
 export interface Progress {
   stages: StageState[];
   done: boolean;
@@ -60,6 +70,10 @@ export interface Progress {
   run?: RunReport;
   notes?: string[];
   expires_in_s?: number;
+  report?: GuardReport | null;
+  plan?: import("./scene").Plan | null;
+  track_id?: string | null;
+  files?: Record<string, string>;
 }
 
 export interface FileData {
@@ -86,6 +100,8 @@ export interface ProcessRequest {
   plan?: unknown;
   /** Also write the 7.1.4 bed for producers. */
   exportBed?: boolean;
+  /** How far the scene opens: intimate, balanced or immersive. */
+  character?: "intimate" | "balanced" | "immersive";
 }
 
 export interface BackendInfo {
@@ -284,12 +300,30 @@ export function buildPayload(serverPath: string, fileName: string, req: ProcessR
       req.motion ?? 0.5,
       req.plan === undefined ? "" : JSON.stringify(req.plan),
       req.exportBed ?? false,
+      req.character ?? "balanced",
+    ],
+  };
+}
+
+/** The /rerender payload: a cached track id instead of a file. */
+export function buildRerenderPayload(trackId: string, req: ProcessRequest): unknown {
+  return {
+    data: [
+      trackId,
+      req.mode,
+      req.profile,
+      req.beta,
+      req.genre ?? "auto",
+      req.motion ?? 0.5,
+      req.plan === undefined ? "" : JSON.stringify(req.plan),
+      req.exportBed ?? false,
+      req.character ?? "balanced",
     ],
   };
 }
 
 /** Start a /process job and stream its updates; resolves with the final output. */
-export async function runProcess(
+export function runProcess(
   base: string,
   serverPath: string,
   fileName: string,
@@ -297,12 +331,33 @@ export async function runProcess(
   onUpdate: (out: ProcessOutput) => void,
   signal?: AbortSignal,
 ): Promise<ProcessOutput> {
+  return runEndpoint(base, "process", buildPayload(serverPath, fileName, req), onUpdate, signal);
+}
+
+/** Re-render a cached track (no upload) and stream its updates. */
+export function runRerender(
+  base: string,
+  trackId: string,
+  req: ProcessRequest,
+  onUpdate: (out: ProcessOutput) => void,
+  signal?: AbortSignal,
+): Promise<ProcessOutput> {
+  return runEndpoint(base, "rerender", buildRerenderPayload(trackId, req), onUpdate, signal);
+}
+
+async function runEndpoint(
+  base: string,
+  endpoint: "process" | "rerender",
+  payload: unknown,
+  onUpdate: (out: ProcessOutput) => void,
+  signal?: AbortSignal,
+): Promise<ProcessOutput> {
   let start: Response;
   try {
-    start = await fetch(`${base}/gradio_api/call/process`, {
+    start = await fetch(`${base}/gradio_api/call/${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildPayload(serverPath, fileName, req)),
+      body: JSON.stringify(payload),
       signal,
     });
   } catch {
@@ -315,7 +370,7 @@ export async function runProcess(
 
   let stream: Response;
   try {
-    stream = await fetch(`${base}/gradio_api/call/process/${eventId}`, { signal });
+    stream = await fetch(`${base}/gradio_api/call/${endpoint}/${eventId}`, { signal });
   } catch {
     if (signal?.aborted) throw new BackendError("Cancelled.", "cancelled");
     throw new BackendError("Lost the connection to the backend.", "unreachable");
