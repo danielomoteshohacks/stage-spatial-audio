@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/danielomoteshohacks/stage-spatial-audio/actions/workflows/ci.yml/badge.svg)](https://github.com/danielomoteshohacks/stage-spatial-audio/actions/workflows/ci.yml)
 [![Licence](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](LICENSE)
-![Status](https://img.shields.io/badge/status-early%20development-orange.svg)
+![Status](https://img.shields.io/badge/status-v2%20in%20listening%20tests-1FC8B4.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 
 > SoundStage is an independent research and engineering project. It is not affiliated with, or endorsed by, Spotify, Apple or Dolby.
@@ -23,43 +23,22 @@ phone, on any song, and the artist could decide whether their track receives it.
 
 ## The idea in one minute
 
-Most stereo upmixers invent positions. SoundStage does the opposite: **it keeps every sound where the stereo
-mix already puts it**, spreads those positions around the listener, gives each role an appropriate
-distance, and adds a believable room. A fidelity guard compares every render with the original so the
-record is never rewritten.
+Most upmixers invent positions. SoundStage does the opposite: **it keeps every sound where the
+mix put it**, splits the song into its parts, and builds a scene around the listener from them,
+through measured human-ear filters in a real-sounding room. The vocal, the bass and the kick never
+move; below 120 Hz the record passes through untouched. A fidelity guard compares every render
+with the original and says what it found.
 
 ```mermaid
 flowchart LR
-    A[Stereo input] --> B[Pan and coherence analysis]
-    B --> C[Primary and ambient split<br/>primary + ambient = input]
-    C --> D[Pan sectors, widened<br/>order preserved]
-    D --> E[HRTF filtering]
-    C --> F[Decorrelated ambient tail]
-    E --> G[Role-based distance and room]
-    F --> G
-    G --> H[Timbre bound and fidelity guard]
-    H --> I[Binaural output]
+    A[Stereo song] --> B[Separation<br/>our engine, else the teacher]
+    B --> C[Analysis<br/>beats, sections, genre]
+    C --> D[Plan<br/>template, motion, plan.json]
+    D --> E[Scene<br/>objects, 7.1.4 bed, motion]
+    E --> F[Binaural rooms<br/>SADIE II KU100 ears]
+    F --> G[Neutrality<br/>bass bypass, timbre, loudness]
+    G --> H[Guard report<br/>verdict and reasons]
 ```
-
-Around that renderer sits the listening bench (decision 0009): a small Python service and a web
-app that plays the original and the spatial render in sync.
-
-```mermaid
-flowchart LR
-    U[Web app<br/>web/, in the browser] -- "upload, progress events,<br/>24-bit FLAC" --> A[Gradio backend<br/>space/app.py]
-    A --> S[Service<br/>stage.service]
-    S --> P[Pipeline<br/>stage.pipeline]
-    P --> D[Separation<br/>Demucs, optional]
-    P --> R[Renderer<br/>stage.render]
-    P --> L[Levels<br/>stage.guard.levels]
-```
-
-Four properties define the design:
-
-1. **Position-preserving.** A sound left of another in the original stays left of it.
-2. **Role-aware.** Kick, bass and lead vocal stay close and dry; pads and effects get space.
-3. **Faithful.** Long-term tone, low end, loudness and timing are checked against the original.
-4. **Light.** The lightest tier needs no neural network and is designed to run in real time on a phone.
 
 ## Three complete tiers
 
@@ -89,69 +68,97 @@ Results, including failures, will be published here with sample sizes and confid
 
 ## Try it
 
-The listening bench runs on your own machine in two terminals (Python 3.10+, Node 20+):
+On a phone with headphones: <https://soundstage-phi.vercel.app>. Drop a song you own, wait for
+the stage to be built, and switch between Original and Spatial. The processing server is
+<https://danieltesh-soundstage.hf.space> (a sleeping Space takes a minute to wake).
+
+On your own machine, in two terminals (Python 3.10+, Node 20+):
 
 ```bash
-# 1. Backend (repository root): Lite only. Add ",separation" for Demucs stems (installs torch).
-python -m pip install -e ".[backend]"
+python -m pip install -e ".[backend]"   # add ",separation" for stems (installs torch, demucs)
 python space/app.py                      # http://127.0.0.1:7860
-
-# 2. Web app
 cd web && npm ci && npm run dev          # http://localhost:5173
 ```
-
-Drop a track, choose an excerpt, render, then switch between Original and Spatial with the big
-toggle or the space bar. Tracks are processed and deleted after 30 minutes; use audio you own or
-may use. Without the separation extra, Stems mode falls back to Lite and the page says so.
 
 From the command line, without the web app:
 
 ```bash
-python scripts/process_track.py track.flac --mode lite --start 30 --seconds 30 --out-dir runs/a
+python scripts/process_track.py track.flac --mode lite --profile space:living_room --out-dir runs/a
 ```
 
-The backend also deploys to a Hugging Face ZeroGPU Space ([`space/README.md`](space/README.md)),
-and the web app to Cloudflare Pages ([`web/README.md`](web/README.md)).
+Tracks are processed and deleted after 30 minutes; use audio you own or may use.
 
 ## Status
 
-Early development. Nothing here yet makes a perceptual claim: the profiles carry objective proxy
-measurements only (decision 0007), and the blind tests have not been run.
+v2 is live: <https://soundstage-phi.vercel.app> (web app) and
+<https://danieltesh-soundstage.hf.space> (processing). What exists, honestly:
 
-- **v2 engine, Phase 1 (decisions 0012 to 0014):** measured KU100 ears from SADIE II,
-  interpolated over the sphere without combing; six binaural spaces with image-source
-  reflections and a multiband late field; the bass below 120 Hz passed through untouched; a
-  timbre and loudness matcher. Every render gets a fidelity report (decision 0011). On the
-  generated test track v2 has no artifact flags where v1 had 38, and four of six spaces pass the
-  guard (two are "review"). These are objective measurements, not a listening result.
-- The listening bench works end to end on a laptop and on the Space (measured in
-  [`docs/log.md`](docs/log.md)).
+- **Real ears and rooms** (decisions 0012 to 0014): head-related filters built from the SADIE II
+  KU100 measurements on GitHub Actions; six spaces with image-source reflections and a late field
+  matched to the head's measured diffuse coherence; the studio fitted to the measured York BRIRs.
+- **The scene and the plan** (0016 to 0018): stems split into direct, ambient and transient
+  parts, placed as objects with a surround and height bed, tempo-locked motion with a speed cap,
+  ten genre templates, an editable plan.json.
+- **Fidelity guard** (0011): BS.1770 loudness, true peak, bass identity, timbre, timestamped
+  artifact flags, a verdict with reasons, on every render.
+- **Our separator** (0015): the engine, training code and Kaggle notebook are done and tested;
+  **its weights are not trained yet**. Until its evaluation reaches htdemucs, the Space uses
+  htdemucs, and run.json says which separator ran.
+- **The product** (0020): new brand, library on the phone, cover-art colours, stage view, Feel,
+  blind test. Head tracking is designed, not shipped.
+- **Not claimed:** no perceptual result yet. The numbers below are objective proxies; the blind
+  test decides.
 
-- [ ] **Slice 1, Hear it:** one clip spatialised by Lite in Python
-- [ ] **Slice 2, Prove it:** measurements and a first blind test
-- [ ] **Slice 3, Make it smart:** stems, roles, style templates
-- [ ] **Slice 4, Make it light:** Rust core and WebAssembly, real time in the browser
-- [ ] **Slice 5, Show it:** demo, efficiency chart, write-up, video
+## Benchmark: v1 against v2
 
-See [`docs/roadmap.md`](docs/roadmap.md).
+Five generated multitrack songs (synthesised drums, bass, chords, a formant voice, ambience; no
+recordings), 30 s each, `scripts/benchmark_spatial.py`, means (decision 0021):
+
+| Metric | Better | v1 Lite | v2 Lite | v2 stems, studio | v2 stems, living room (default) |
+|---|---|---|---|---|---|
+| IACC | lower | 0.956 | 0.887 | 0.973 | **0.830** |
+| ITD spread (us) | higher | 96.5 | 184 | 103 | **273** |
+| ILD spread (dB) | higher | 7.19 | 5.96 | 6.46 | **7.60** |
+| DRR estimate (dB) | lower: more room | 7.19 | 15.4 | 7.53 | **3.09** |
+| Lateral energy | higher | 0.0068 | **0.118** | 0.0094 | 0.0804 |
+| Interaural coherence | lower | 0.949 | **0.419** | 0.965 | 0.759 |
+| Timbre deviation (dB) | lower | 4.45 | 1.20 | **0.95** | 2.39 |
+| Artifact flags per 30 s | lower | 18.2 | **0** | **0** | **0** |
+| Bass correlation (< 120 Hz) | higher | 0.999 | **1.000** | **1.000** | **1.000** |
+| Loudness difference (LU) | lower | 0.046 | **0** | **0** | **0** |
+| Render time, 30 s, 4 vCPU (s) | lower | **1.8** | 4.0 | 8.8 | 8.8 |
+| Guard verdict | | 5 review | 5 pass | 5 pass | 5 pass |
+
+Where v2 does not win, decision 0021 says why (render time; the deliberately dry studio).
+
+## Separation
+
+| Engine | Avg SDR, MUSDB18-HQ test | Size | CPU per 30 s | Status |
+|---|---|---|---|---|
+| htdemucs (teacher fallback) | 9.0 dB (Demucs README) | measured on Kaggle | GPU on the Space | in use |
+| SoundStage Separator | not trained yet | 8.4 MB (fp16 ONNX) | 9.8 s on 4 vCPU | default only once it reaches htdemucs |
+
+MUSDB18-HQ is for research use only; weights trained on it are research weights. The training
+steps for Kaggle's free GPUs are in [`training/README.md`](training/README.md).
 
 ## Repository layout
 
 | Path | Purpose | Status |
 |---|---|---|
 | [`src/stage/`](src/stage/) | Python reference implementation (the oracle) | active |
-| [`schemas/`](schemas/) | JSON Schemas for the plan, report and consent files | active |
+| [`schemas/`](schemas/) | JSON Schemas for the plan, report, run and consent files | active |
 | [`tests/`](tests/) | Unit, property, golden-file and integration tests | active |
 | [`docs/`](docs/) | Specifications, architecture, roadmap, decision records | active |
 | [`experiments/`](experiments/) | Hypotheses, gates and results | active |
 | [`stage-core/`](stage-core/) | Rust real-time core, compiled to WebAssembly | planned |
-| [`tools/hrtf-pack/`](tools/hrtf-pack/) | Converts open SOFA data into a compact pack | planned |
-| [`web/`](web/) | Listening bench: sync A/B player, progress, run report | active |
+| [`tools/hrtf-pack/`](tools/hrtf-pack/) | Builds the measured HRTF pack from SADIE II (on GitHub Actions) | active |
+| [`training/`](training/) | SoundStage Separator training (Kaggle) and export | active |
+| [`web/`](web/) | The web app: library, player, stage view, blind test | active |
 | [`space/`](space/) | Gradio backend for a laptop or a Hugging Face Space | active |
 | [`android/`](android/) | Optional Android client | planned |
-| [`configs/`](configs/) | Style templates, modes, guard thresholds | planned |
-| [`models/`](models/) | Model manifest (files are never committed) | planned |
-| [`data/`](data/) | Dataset manifest (audio is never committed) | planned |
+| [`configs/`](configs/) | Genre templates, spaces, guard thresholds | active |
+| [`models/`](models/) | Model and dataset manifest (files are never committed) | active |
+| [`data/`](data/) | Dataset licences (audio is never committed) | active |
 | [`benchmarks/`](benchmarks/) | Reproducible performance measurements | active (Python) |
 | [`examples/`](examples/) | Small runnable examples | planned |
 | [`scripts/`](scripts/) | Processing, rendering, blind-test and test-signal helpers | active |

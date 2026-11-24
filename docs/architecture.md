@@ -41,41 +41,47 @@ only calls the one below it; the renderer in `src/stage/render` is not changed b
 
 ```mermaid
 flowchart TB
-    W["web/ (Svelte, in the browser)<br/>upload, progress, sample-locked A/B player"]
-    G["space/app.py (Gradio)<br/>one streaming /process endpoint, queue of 1"]
-    S["stage.service<br/>validation, excerpt, temp folder, time-to-live"]
-    P["stage.pipeline.run<br/>load, separate, render, levels, write"]
-    D["stage.separation.demucs_sep<br/>Demucs; GPU only here on ZeroGPU"]
-    R["stage.render (reference renderer)"]
-    L["stage.guard.levels<br/>RMS match, peak limit"]
+    W["web/ (Svelte PWA)<br/>library, player, stage view, blind test"]
+    G["space/app.py (Gradio)<br/>/process and /rerender, streaming, queue of 1"]
+    S["stage.service<br/>validation, auto start, track cache, time-to-live"]
+    P["stage.pipeline.run<br/>load, separate, analyse, render, levels, guard, write"]
+    C["stage.separation.chain<br/>ssep (ONNX, CPU), then teacher (GPU), then Lite"]
+    A["stage.scene.analysis, genre, plan<br/>beats, sections, template, plan.json"]
+    R["stage.scene.render<br/>objects, bed, motion, distance"]
+    H["stage.spatial<br/>SADIE II HRTFs, binaural rooms, bass bypass, timbre match"]
+    Q["stage.guard.report<br/>BS.1770, true peak, artifacts, verdict"]
     W -- "HTTP: upload, server-sent events, FLAC files" --> G
     G --> S --> P
-    P --> D
-    P --> R
-    P --> L
+    P --> C
+    P --> A
+    P --> R --> H
+    P --> Q
 ```
 
-- **Pipeline** (`stage.pipeline.run`): every stage records ok, failed or skipped, with its
-  duration and error, and no failure escapes. If separation fails or is unavailable, the whole mix
-  is rendered in Lite and the fallback is recorded. In stems mode the stems are rendered one at a
-  time and summed, so peak memory stays near that of one Lite render. Outputs are 24-bit FLAC
-  plus `run.json` ([`schemas/run.schema.json`](../schemas/run.schema.json)).
-- **Service** (`stage.service`): pure Python, no Gradio. It validates the upload (type, size, at
-  most 12 minutes), chooses the excerpt (30 s from 30 s in by default), runs the pipeline in a
-  fresh folder and deletes runs after 30 minutes.
-- **App** (`space/app.py`): the same file runs on a laptop and on a Hugging Face ZeroGPU Space.
-  Only the separation call is wrapped in `@spaces.GPU`.
-- **Web** (`web/`): plays the original, the spatial render and the spatial stems from AudioBuffers
-  started at one AudioContext time, and switches with a 30 ms gain crossfade.
+- **Pipeline** (`stage.pipeline.run`): seven stages, each recorded as ok, failed or skipped with
+  its duration and error; no failure escapes. Separation runs through the fallback chain
+  (decision 0015) and each attempt is recorded. v2 builds a plan from the song analysis and the
+  genre template (or renders an edited plan), renders the scene, and writes report.json
+  (decision 0011), plan.json, per-object stems and optionally a 7.1.4 bed.
+- **Service** (`stage.service`): validates the upload, picks the loudest excerpt by default,
+  caches the excerpt, stems, analysis and genre per track for re-renders without re-separating,
+  and deletes everything after 30 minutes.
+- **App** (`space/app.py`): runs on a laptop and on the Hugging Face ZeroGPU Space; only the
+  teacher separator is inside `@spaces.GPU`. At start-up it fetches the HRTF pack, the genre
+  tagger and, once published, the SoundStage Separator weights.
+- **Web** (`web/`): plays the original, the render and the object stems from AudioBuffers started
+  at one AudioContext time; switches with a 30 ms cross-fade; keeps renders in IndexedDB.
 
 ## Mapping from the specification to this repository
 
 | Specification | Here |
 |---|---|
 | Python reference renderer and analysis | `src/stage/analysis`, `src/stage/render` |
-| Offline engine (separation, plan, guard) | `src/stage/separation`, `mixplan`, `guard` |
+| Offline engine (separation, plan, guard) | `src/stage/separation`, `src/stage/scene`, `src/stage/guard` |
+| Measured HRTFs and binaural rooms | `src/stage/spatial`, `tools/hrtf-pack/`, `configs/spaces/` |
+| Separator training | `training/` (Kaggle) |
 | Rust real-time core | `stage-core/` |
-| HRTF pack tool | `tools/hrtf-pack/` |
+| HRTF pack tool | `tools/hrtf-pack/`, built by `.github/workflows/hrtf-pack.yml` |
 | Offline pipeline and its CLI | `src/stage/pipeline.py`, `scripts/process_track.py` |
 | Processing service and API | `src/stage/service.py`, `space/` |
 | Web demo and listening bench | `web/` |

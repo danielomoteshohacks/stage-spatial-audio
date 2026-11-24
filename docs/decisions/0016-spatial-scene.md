@@ -46,6 +46,11 @@ listener.
    and every object stem (decision 0014), so the object stems plus the low end sum to the render
    exactly (to 1e-16 in the tests).
 
+8. **Room distance** (added in Phase 6): the room model places each object at its template
+   distance times the space's listening distance over 2 m (the template's home scale), so a hall
+   is heard from a seat in it; level and near-field cues keep the template distance. Without this
+   the club and the hall were barely more spacious than v1 (decision 0021).
+
 ## Covariance-domain rendering and patents
 
 Vilkamo, Backstrom and Kuntz (JAES 2013, "Optimized covariance domain framework for

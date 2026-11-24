@@ -346,3 +346,34 @@ end in Chromium at phone size against a local backend.
 ### Next
 
 Head tracking stays a design (0020). Phase 6: the benchmark.
+
+## 2026-11-24: v2 Phase 6, proof
+
+### Done
+
+- `scripts/benchmark_spatial.py` (decision 0021) and its results table, here and in the README.
+- The blind test is in the web app (decision 0020).
+- Default space changed to the living room, the most enveloping space that still passes the guard.
+
+### Measured
+
+Five generated songs, 30 s each (table in 0021): v2 stems in the living room against v1 Lite,
+IACC 0.83 against 0.96, ITD spread 273 against 97 us, lateral energy 0.080 against 0.007,
+coherence 0.76 against 0.95, artifact flags 0 against 18, bass correlation 1.000, loudness
+matched exactly, every v2 render passes the guard; render 8.8 s against 1.8 s.
+
+### What went wrong
+
+- The first benchmark showed the stems scene barely more spacious than v1 in every space: object
+  distances were home-scale, so in the club and the hall the listener sat on top of every source.
+  The room model now scales distances to each space's listening distance (decision 0016 updated
+  by this entry); level cues keep the template distance, so the balance is unchanged.
+- The guard's alignment estimate read 2.4 ms on reverberant scenes; it now takes the earliest
+  peak within 12 dB and snaps to the local maximum. Every zero-lag reading is under 0.4 ms and
+  clean shifts are exact, but on reverberant scenes deliberately injected 1 to 3 ms shifts are
+  only coarsely measured: a known limit of the check.
+
+### Next
+
+The owner runs the Kaggle notebook (the separator), the blind test with listeners, and a check on
+the Galaxy S21 FE.

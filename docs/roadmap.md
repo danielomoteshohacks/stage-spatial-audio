@@ -35,3 +35,22 @@ Progress is recorded in [`log.md`](log.md).
 
 Rules: always keep a working version; add one idea at a time; decide the test before the work;
 time-box experiments; end each session with three lines (done, measured, next).
+
+## v2 rebuild (November 2026)
+
+The owner's listening of v1 (static, dry, inside the head, audible artifacts) started a rebuild
+in phases, each pushed to main green and recorded in [`log.md`](log.md):
+
+| Phase | What | Status |
+|---|---|---|
+| 0 | Guard report, auto start, input fixes | done |
+| 1 | Measured HRTFs (SADIE II), interpolation, binaural rooms, neutrality | done |
+| 2A | SoundStage Separator: engine, training, evaluation | code done; Kaggle training pending (owner) |
+| 2B | Stereo mix to a spatial scene: objects, bed, distance | done |
+| 3 | Analysis, genre templates, motion, plan.json | done |
+| 4 | Speed, cache, outputs, /rerender | done |
+| 5 | The product (web app) | done; head tracking designed, not shipped |
+| 6 | Objective benchmark, blind-test page | done; listening tests pending |
+
+Next: train the separator on Kaggle, run the blind test with listeners, check on a Galaxy S21 FE,
+then decide on head tracking.
