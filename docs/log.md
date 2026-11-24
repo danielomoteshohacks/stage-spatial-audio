@@ -297,3 +297,27 @@ and no artifact flags; render 23 to 29 s per 30 s on the build machine (too slow
 ### Next
 
 Phase 4: speed, the per-track cache, outputs and /rerender.
+
+## 2026-11-24: v2 Phase 4, speed, the cache and /rerender
+
+### Done
+
+- Scene render 21 s to 8.4 s per 30 s (openness curve at control rate, cheaper HPSS).
+- Per-track cache of the excerpt, stems, analysis and genre (decision 0019); `stage.service.rerender`.
+- `/process` gains genre, motion, plan and the 7.1.4 flag; `/rerender` added; the final update
+  carries the plan, the track id and file paths. The web client sends the new fields.
+- `benchmarks/render_times.py`.
+
+### Measured
+
+v2 Lite 4.1 to 5.0 s, full stems scene 8.4 to 15.6 s per 30 s on the build machine (table in
+0019). Process then re-render from the cache is covered by `tests/backend/test_app.py`.
+
+### What went wrong
+
+The guard's alignment estimate read an impossible -2.8 ms on a reverberant scene; fixed with a
+causality-aware peak choice (0019).
+
+### Next
+
+Phase 5: the product.

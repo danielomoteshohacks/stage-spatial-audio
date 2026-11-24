@@ -7,7 +7,9 @@ folders older than the time-to-live are deleted on every call and by `start_swee
 
 from __future__ import annotations
 
+import hashlib
 import math
+import os
 import queue
 import shutil
 import subprocess
@@ -26,6 +28,7 @@ from stage import pipeline
 from stage.engines import DEFAULT_PROFILE, profile_names
 from stage.pipeline import MODES, Separator
 from stage.render.sectors import WIDEN_BETA_MAX, WIDEN_BETA_MIN
+from stage.scene.plan import templates, validate_plan
 
 ALLOWED_EXTENSIONS = (".wav", ".flac", ".mp3", ".ogg", ".m4a")
 MAX_TRACK_S = 12 * 60.0
@@ -52,6 +55,10 @@ class ServiceOptions:
     beta: float = 2.0
     start: float | str | None = "auto"  # "auto" or None: the loudest window; else seconds
     seconds: float | str | None = None  # None or "": DEFAULT_SECONDS
+    genre: str | None = None  # None or "": the tagger or the default template
+    motion: float = pipeline.DEFAULT_MOTION
+    plan: dict[str, Any] | None = None  # an edited plan.json to render
+    export_bed: bool = False
 
 
 @dataclass
@@ -69,16 +76,24 @@ class ServiceResult:
     report_json: Path | None
     expires_at: float
     notes: list[str] = field(default_factory=list)
+    track_id: str | None = None
+    bed: Path | None = None
+
+
+TRACKS = "tracks"
 
 
 def sweep_expired(root: Path = WORK_ROOT, ttl_s: float = DEFAULT_TTL_S,
                   now: float | None = None) -> list[Path]:
-    """Delete run folders whose last change is older than `ttl_s`; return what was deleted."""
+    """Delete run folders and track caches older than `ttl_s`; return what was deleted."""
     if not root.exists():
         return []
     now = time.time() if now is None else now
     removed = []
-    for child in root.iterdir():
+    children = [c for c in root.iterdir() if c.name != TRACKS]
+    if (root / TRACKS).is_dir():
+        children += list((root / TRACKS).iterdir())
+    for child in children:
         try:
             if now - child.stat().st_mtime > ttl_s:
                 if child.is_dir():
@@ -223,12 +238,36 @@ def resolve_excerpt(duration: float, start: Any,
     return begin, length, notes
 
 
+def track_key(path: Path, start: float | str, seconds: float) -> str:
+    """Cache key of an excerpt: SHA-256 of the file's bytes and the excerpt, 24 hex characters."""
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    h.update(f"|{start}|{seconds:.3f}".encode())
+    return h.hexdigest()[:24]
+
+
 def validate_options(options: ServiceOptions) -> None:
     if options.mode not in MODES:
         raise ValidationError(f"Mode must be one of: {', '.join(MODES)}.")
     if options.profile not in profile_names():
         raise ValidationError(f"Unknown profile {options.profile!r}. Known: "
                               f"{', '.join(profile_names())}.")
+    if options.genre and options.genre not in templates():
+        raise ValidationError(f"Unknown genre {options.genre!r}. Known: "
+                              f"{', '.join(sorted(templates()))}.")
+    try:
+        motion = float(options.motion)
+    except (TypeError, ValueError):
+        raise ValidationError("Motion must be a number from 0 to 1.") from None
+    if not 0.0 <= motion <= 1.0:
+        raise ValidationError("Motion must be between 0 (still) and 1 (full).")
+    if options.plan is not None:
+        try:
+            validate_plan(options.plan)
+        except Exception as exc:
+            raise ValidationError(f"The plan was refused: {exc}") from exc
     if not WIDEN_BETA_MIN <= float(options.beta) <= WIDEN_BETA_MAX:
         raise ValidationError(f"Width (beta) must be between {WIDEN_BETA_MIN} and "
                               f"{WIDEN_BETA_MAX}.")
@@ -261,13 +300,59 @@ def process_upload(
         shutil.rmtree(run_dir, ignore_errors=True)
         raise
     notes += excerpt_notes
-    out = run_dir / "out"
-    result = pipeline.run(
-        readable, mode=options.mode, profile=options.profile, beta=float(options.beta),
-        start=start, seconds=seconds, out_dir=out, separator=separator, on_stage=on_stage,
-    )
+    key = track_key(readable, start, seconds)
+    cache = root / TRACKS / key
+    result = _run(readable, options, run_dir, start=start, seconds=seconds, separator=separator,
+                  on_stage=on_stage, cache=cache, key=key)
     if readable != Path(path):
         readable.unlink(missing_ok=True)  # the decoded copy is not an output
+    return _result(result, run_dir, ttl_s, notes, key)
+
+
+def _run(readable: Path, options: ServiceOptions, run_dir: Path, *, start, seconds, separator,
+         on_stage, cache: Path, key: str) -> pipeline.RunResult:
+    return pipeline.run(
+        readable, mode=options.mode, profile=options.profile, beta=float(options.beta),
+        start=start, seconds=seconds, out_dir=run_dir / "out", separator=separator,
+        on_stage=on_stage, genre=options.genre or None, motion=float(options.motion),
+        plan=options.plan, export_bed=bool(options.export_bed), cache_dir=cache, track_id=key,
+    )
+
+
+def rerender(
+    track_id: str,
+    options: ServiceOptions | None = None,
+    *,
+    separator: Separator | None = None,
+    on_stage: pipeline.StageCallback | None = None,
+    root: Path = WORK_ROOT,
+    ttl_s: float = DEFAULT_TTL_S,
+) -> ServiceResult:
+    """Render a cached excerpt again with other settings or an edited plan; nothing is uploaded.
+
+    The separated stems and the analysis come from the track's cache, so the GPU is not used
+    again. Raises ValidationError when the track is unknown or has expired.
+    """
+    options = options or ServiceOptions()
+    validate_options(options)
+    if not track_id or not all(c in "0123456789abcdef" for c in track_id) or len(track_id) != 24:
+        raise ValidationError("That track id is not valid.")
+    sweep_expired(root, ttl_s)
+    cache = root / TRACKS / track_id
+    source = cache / "original.flac"
+    if not source.is_file():
+        raise ValidationError("That track has expired from the server. Upload it again.")
+    os.utime(cache)  # a re-render keeps the cache alive for another time-to-live
+    run_dir = root / uuid.uuid4().hex
+    run_dir.mkdir(parents=True)
+    result = _run(source, options, run_dir, start=0.0, seconds=None, separator=separator,
+                  on_stage=on_stage, cache=cache, key=track_id)
+    return _result(result, run_dir, ttl_s, ["re-rendered from the track cache"], track_id)
+
+
+def _result(result: pipeline.RunResult, run_dir: Path, ttl_s: float, notes: list[str],
+            key: str) -> ServiceResult:
+    out = run_dir / "out"
 
     def existing(rel: str | None) -> Path | None:
         return None if rel is None or not (out / rel).exists() else out / rel
@@ -287,15 +372,14 @@ def process_upload(
         report_json=existing(outs.get("report")),
         expires_at=time.time() + ttl_s,
         notes=notes,
+        track_id=key,
+        bed=existing(outs.get("bed_7_1_4")),
     )
 
 
-def stream_process_upload(
-    path: str | Path,
-    options: ServiceOptions | None = None,
-    **kwargs: Any,
-) -> Iterator[dict[str, Any]]:
-    """Run `process_upload` in a worker thread and yield each stage event as it happens.
+def _stream(fn, first: Any, options: ServiceOptions | None, **kwargs: Any
+            ) -> Iterator[dict[str, Any]]:
+    """Run `fn` in a worker thread and yield each stage event as it happens.
 
     Yields {"type": "stage", ...} events, then exactly one {"type": "result", "result": ...} or
     {"type": "error", "message": ...}. Lets a streaming endpoint show progress without the
@@ -305,8 +389,8 @@ def stream_process_upload(
 
     def work() -> None:
         try:
-            res = process_upload(path, options, on_stage=lambda e: events.put(
-                {"type": "stage", **e}), **kwargs)
+            res = fn(first, options, on_stage=lambda e: events.put({"type": "stage", **e}),
+                     **kwargs)
             events.put({"type": "result", "result": res})
         except ValidationError as exc:
             events.put({"type": "error", "message": str(exc)})
@@ -322,3 +406,15 @@ def stream_process_upload(
         if event["type"] in ("result", "error"):
             break
     thread.join()
+
+
+def stream_process_upload(path: str | Path, options: ServiceOptions | None = None,
+                          **kwargs: Any) -> Iterator[dict[str, Any]]:
+    """`process_upload` as a stream of stage events and one result or error."""
+    return _stream(process_upload, path, options, **kwargs)
+
+
+def stream_rerender(track_id: str, options: ServiceOptions | None = None,
+                    **kwargs: Any) -> Iterator[dict[str, Any]]:
+    """`rerender` as a stream of stage events and one result or error."""
+    return _stream(rerender, track_id, options, **kwargs)

@@ -30,8 +30,9 @@ import gradio as gr  # noqa: E402
 
 from stage import __version__  # noqa: E402
 from stage.engines import DEFAULT_PROFILE, profile_names  # noqa: E402
-from stage.pipeline import MODES, STAGES  # noqa: E402
+from stage.pipeline import DEFAULT_MOTION, MODES, STAGES  # noqa: E402
 from stage.render.sectors import WIDEN_BETA_MAX, WIDEN_BETA_MIN  # noqa: E402
+from stage.scene.plan import templates  # noqa: E402
 from stage.separation.chain import separate_chain  # noqa: E402
 from stage.separation.demucs_sep import Separation, separate  # noqa: E402
 from stage.service import (  # noqa: E402
@@ -44,6 +45,7 @@ from stage.service import (  # noqa: E402
     ServiceOptions,
     start_sweeper,
     stream_process_upload,
+    stream_rerender,
 )
 
 try:
@@ -81,39 +83,45 @@ def _progress(stages: dict[str, dict[str, Any]], **extra: Any) -> dict[str, Any]
     return {"stages": [stages[name] for name in STAGES], **extra}
 
 
-def process(audio_file, mode, profile, beta, start, seconds):
-    """Stream stage progress, then return original, spatial, spatial stems and run.json."""
-    stages = {n: {"stage": n, "status": "pending", "duration_s": 0.0, "error": None}
-              for n in STAGES}
-    if not audio_file:
-        yield _progress(stages, done=True, error="No file was uploaded."), None, None, None, None
-        return
-    path = audio_file if isinstance(audio_file, str) else getattr(audio_file, "name", audio_file)
-    # Start and length arrive as text (or numbers from older clients); empty means the default
-    # and the service validates both, so a bad value comes back as a message, not a crash.
-    options = ServiceOptions(
+def _options(mode, profile, beta, genre, motion, plan_text, export_bed, start=None,
+             seconds=None) -> ServiceOptions:
+    """Form values to service options. Text and numbers are both accepted (older clients send
+    numbers); the service validates everything and answers with a message, never a crash."""
+    plan = None
+    if plan_text not in (None, ""):
+        plan = plan_text if isinstance(plan_text, dict) else json.loads(plan_text)
+    return ServiceOptions(
         mode=mode or "lite", profile=profile or DEFAULT_PROFILE,
-        beta=float(beta) if beta is not None else 2.0,
-        start=start, seconds=seconds,
+        beta=float(beta) if beta is not None else 2.0, start=start, seconds=seconds,
+        genre=None if genre in (None, "", "auto") else str(genre),
+        motion=DEFAULT_MOTION if motion in (None, "") else float(motion),
+        plan=plan, export_bed=bool(export_bed),
     )
-    yield _progress(stages, done=False, error=None), None, None, None, None
-    for event in stream_process_upload(path, options, separator=chain_separate):
+
+
+def _respond(events, stages):
+    """Turn service events into the five streamed outputs."""
+    nothing = (None, None, None, None)
+    for event in events:
         if event["type"] == "stage":
             stages[event["stage"]] = {k: event[k] for k in ("stage", "status", "duration_s",
                                                              "error")}
-            yield _progress(stages, done=False, error=None), None, None, None, None
+            yield (_progress(stages, done=False, error=None), *nothing)
         elif event["type"] == "error":
-            yield _progress(stages, done=True, error=event["message"]), None, None, None, None
+            yield (_progress(stages, done=True, error=event["message"]), *nothing)
         else:
             res = event["result"]
             # v2 returns its per-object spatial stems (lead vocal, percussion, pads, low end...),
             # which sum to spatial.flac; v1 returns its four spatial stems.
             parts = res.objects or res.stems_spatial
             stems = [str(parts[k]) for k in sorted(parts)] or None
+            files = {k: str(v) for k, v in (("plan", res.plan_json), ("report", res.report_json),
+                                            ("bed_7_1_4", res.bed)) if v is not None}
             yield (
                 _progress(stages, done=True, error=None if res.ok else "Rendering failed; see "
                           "the stage list for the reason.", run=res.run, notes=res.notes,
-                          report=_read_json(res.report_json),
+                          report=_read_json(res.report_json), plan=_read_json(res.plan_json),
+                          track_id=res.track_id, files=files,
                           expires_in_s=round(res.expires_at - time.time())),
                 str(res.original) if res.original else None,
                 str(res.spatial) if res.spatial else None,
@@ -122,12 +130,51 @@ def process(audio_file, mode, profile, beta, start, seconds):
             )
 
 
+def _fresh_stages() -> dict[str, dict[str, Any]]:
+    return {n: {"stage": n, "status": "pending", "duration_s": 0.0, "error": None}
+            for n in STAGES}
+
+
+def process(audio_file, mode, profile, beta, start, seconds, genre="auto",
+            motion=DEFAULT_MOTION, plan="", export_bed=False):
+    """Stream stage progress, then return original, spatial, spatial stems and run.json."""
+    stages = _fresh_stages()
+    if not audio_file:
+        yield _progress(stages, done=True, error="No file was uploaded."), None, None, None, None
+        return
+    path = audio_file if isinstance(audio_file, str) else getattr(audio_file, "name", audio_file)
+    try:
+        options = _options(mode, profile, beta, genre, motion, plan, export_bed, start, seconds)
+    except (ValueError, TypeError) as exc:
+        yield (_progress(stages, done=True, error=f"The settings were not understood: {exc}"),
+               None, None, None, None)
+        return
+    yield _progress(stages, done=False, error=None), None, None, None, None
+    yield from _respond(stream_process_upload(path, options, separator=chain_separate), stages)
+
+
+def rerender(track_id, mode, profile, beta, genre="auto", motion=DEFAULT_MOTION, plan="",
+             export_bed=False):
+    """Render a cached track again with new settings or an edited plan. No upload, no GPU."""
+    stages = _fresh_stages()
+    try:
+        options = _options(mode, profile, beta, genre, motion, plan, export_bed)
+    except (ValueError, TypeError) as exc:
+        yield (_progress(stages, done=True, error=f"The settings were not understood: {exc}"),
+               None, None, None, None)
+        return
+    yield _progress(stages, done=False, error=None), None, None, None, None
+    yield from _respond(stream_rerender(str(track_id or ""), options, separator=chain_separate),
+                        stages)
+
+
 def build() -> gr.Blocks:
+    genres = [("auto (tagger)", "auto")] + [(t["label"], name) for name, t in templates().items()]
     with gr.Blocks(title="SoundStage backend", delete_cache=(600, int(DEFAULT_TTL_S))) as demo:
         gr.Markdown(
             f"## SoundStage backend {__version__}\n"
-            "This is the processing API for the SoundStage listening bench. Tracks are processed "
-            "and then deleted; use audio you own or may use."
+            "This is the processing API for the SoundStage web app. Tracks are processed and "
+            "then deleted; use audio you own or may use."
         )
         with gr.Row():
             with gr.Column():
@@ -138,7 +185,7 @@ def build() -> gr.Blocks:
                                       info="space:<name> is the v2 engine; max and V0 to V5b "
                                            "are v1, kept for comparison.")
                 beta = gr.Slider(WIDEN_BETA_MIN, WIDEN_BETA_MAX, value=2.0, step=0.05,
-                                 label="Width (beta)")
+                                 label="Width (beta, v1 only)")
                 # Text boxes, not gr.Number: a Number shows 0 when it is empty, which reads as a
                 # choice and would send a 0-second length. Empty here means the default.
                 start = gr.Textbox(value="", label="Start (seconds)", placeholder="auto",
@@ -147,16 +194,25 @@ def build() -> gr.Blocks:
                                      placeholder=f"{DEFAULT_SECONDS:.0f}",
                                      info=f"Empty for {DEFAULT_SECONDS:.0f} s; "
                                           f"{MIN_EXCERPT_S:.0f} to {MAX_EXCERPT_S:.0f} s.")
+                genre = gr.Dropdown(genres, value="auto", label="Genre")
+                motion = gr.Slider(0.0, 1.0, value=DEFAULT_MOTION, step=0.05,
+                                   label="Motion depth", info="0 is a still scene.")
+                plan = gr.Textbox(value="", label="Plan (JSON, optional)", lines=2)
+                export_bed = gr.Checkbox(value=False, label="Also write the 7.1.4 bed (WAV)")
                 go = gr.Button("Process", variant="primary")
+                track_id = gr.Textbox(value="", label="Track id (for re-render)")
+                again = gr.Button("Re-render")
             with gr.Column():
                 progress = gr.JSON(label="Progress and run report")
                 original = gr.File(label="original.flac")
                 spatial = gr.File(label="spatial.flac")
                 stems = gr.File(label="Spatial stems", file_count="multiple")
                 run_json = gr.File(label="run.json")
-        go.click(process, [audio, mode, profile, beta, start, seconds],
-                 [progress, original, spatial, stems, run_json], api_name="process",
-                 concurrency_limit=1)
+        outputs = [progress, original, spatial, stems, run_json]
+        go.click(process, [audio, mode, profile, beta, start, seconds, genre, motion, plan,
+                           export_bed], outputs, api_name="process", concurrency_limit=1)
+        again.click(rerender, [track_id, mode, profile, beta, genre, motion, plan, export_bed],
+                    outputs, api_name="rerender", concurrency_limit=1)
     # One job at a time: a render holds whole-signal arrays, and the GPU quota is per visitor.
     demo.queue(default_concurrency_limit=1, max_size=16)
     return demo

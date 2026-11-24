@@ -428,6 +428,10 @@
           "additionalProperties": true
         }
       ]
+    },
+    "track_id": {
+      "type": "string",
+      "description": "Cache key of the excerpt; /rerender takes it."
     }
   },
   "additionalProperties": false,

@@ -78,13 +78,17 @@ class SceneResult:
 # --- Parts of a stem ---------------------------------------------------------------------------
 
 
-def hpss(x: NDArray, kernel: int = 17) -> tuple[NDArray, NDArray]:
-    """(harmonic, percussive) of (2, n), percussive = x - harmonic exactly."""
-    n_fft, hop = 2048, 512
+def hpss(x: NDArray, time_kernel: int = 9, freq_kernel: int = 17) -> tuple[NDArray, NDArray]:
+    """(harmonic, percussive) of (2, n), percussive = x - harmonic exactly.
+
+    2048-point frames at a 1024 hop with a 9-frame time median cover the same 0.2 s as
+    Fitzgerald's 17 frames at a 512 hop, at a quarter of the cost.
+    """
+    n_fft, hop = 2048, 1024
     spec = stft(x, n_fft=n_fft, hop=hop)
     mag = np.abs(spec).mean(axis=0)
-    harm = median_filter(mag, size=(kernel, 1), mode="nearest")
-    perc = median_filter(mag, size=(1, kernel), mode="nearest")
+    harm = median_filter(mag, size=(time_kernel, 1), mode="nearest")
+    perc = median_filter(mag, size=(1, freq_kernel), mode="nearest")
     mask = harm**2 / (harm**2 + perc**2 + 1e-20)
     h = istft(spec * mask[np.newaxis], x.shape[1], n_fft=n_fft, hop=hop)
     return h, x - h
@@ -110,22 +114,27 @@ def stem_parts(high: NDArray, sample_rate: int) -> dict[str, NDArray]:
 
 
 def openness_curve(plan: dict[str, Any], n: int, sample_rate: int) -> NDArray[np.float64]:
-    """Per-sample openness from the plan's sections, with a one-bar raised-cosine between them."""
-    out = np.full(n, 0.5)
+    """Per-sample openness from the plan's sections, with a one-bar raised-cosine between them.
+
+    Built at 100 values per second and interpolated: the curve changes over bars, and smoothing
+    it at the audio rate (an 86 000-tap window) took 9 s of a 21 s render.
+    """
+    rate = 100.0
+    m = int(np.ceil(n / sample_rate * rate)) + 1
+    out = np.full(m, 0.5)
     sections = plan.get("sections") or []
-    if not sections:
-        return out
-    for s in sections:
-        a, b = int(s["start_s"] * sample_rate), int(s["end_s"] * sample_rate)
-        out[max(0, a) : min(n, b)] = s["openness"]
-    out[: int(sections[0]["start_s"] * sample_rate)] = sections[0]["openness"]
-    out[int(sections[-1]["end_s"] * sample_rate) :] = sections[-1]["openness"]
-    bar = int(4 * 60.0 / plan.get("tempo_bpm", 120.0) * sample_rate)
-    if bar > 1:
-        k = np.hanning(bar)
-        out = np.convolve(np.pad(out, (bar // 2, bar - bar // 2 - 1), mode="edge"), k / k.sum(),
-                          mode="valid")[:n]
-    return out
+    if sections:
+        for s in sections:
+            a, b = int(s["start_s"] * rate), int(np.ceil(s["end_s"] * rate))
+            out[max(0, a) : min(m, b)] = s["openness"]
+        out[: int(sections[0]["start_s"] * rate)] = sections[0]["openness"]
+        out[int(sections[-1]["end_s"] * rate) :] = sections[-1]["openness"]
+        bar = int(4 * 60.0 / plan.get("tempo_bpm", 120.0) * rate)
+        if bar > 1:
+            k = np.hanning(bar)
+            out = np.convolve(np.pad(out, (bar // 2, bar - bar // 2 - 1), mode="edge"),
+                              k / k.sum(), mode="valid")[:m]
+    return np.interp(np.arange(n) / sample_rate, np.arange(m) / rate, out)
 
 
 def motion_offsets(plan: dict[str, Any], motion: dict[str, Any], times: NDArray) -> NDArray:

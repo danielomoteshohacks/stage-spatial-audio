@@ -69,7 +69,7 @@ describe("api", () => {
   it("builds the /process payload in the endpoint's parameter order", () => {
     const body = buildPayload("/tmp/x.flac", "x.flac", { mode: "stems", profile: "max", beta: 2, start: null, seconds: 30 });
     expect(body).toEqual({
-      data: [{ path: "/tmp/x.flac", orig_name: "x.flac", meta: { _type: "gradio.FileData" } }, "stems", "max", 2, "", "30"],
+      data: [{ path: "/tmp/x.flac", orig_name: "x.flac", meta: { _type: "gradio.FileData" } }, "stems", "max", 2, "", "30", "auto", 0.5, "", false],
     });
   });
 

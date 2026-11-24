@@ -108,7 +108,8 @@ def check_alignment(
     are cross-correlated: transients mark time even in a reverberant render, where a waveform
     cross-correlation is dominated by reverberation and by the periodic, sign-alternating side
     peaks of bass notes and sustained chords. Then the 1 to 8 kHz waveforms are cross-correlated
-    within +/-3 ms of that lag, and the earliest peak within 6 dB of the largest is taken.
+    within +/-3 ms of that lag, and the earliest peak within 6 dB of the largest is taken (one
+    before zero lag only if it is nearly the largest).
     Material without transients falls back to the
     waveform correlation over the whole range. The reported correlation is the normalised
     correlation at the lag, so an inverted render still shows a negative value.
@@ -135,12 +136,15 @@ def check_alignment(
         lags = np.arange(lo, hi + 1)
         mag = np.abs(values[lags % nfft])
         if earliest:
-            # The direct sound arrives before its reflections: take the first local peak within
-            # 6 dB of the largest, not a reflection that the room happened to make stronger.
+            # The direct sound arrives before its reflections, so the earliest local peak within
+            # 6 dB of the largest is taken. A peak before zero lag (a render ahead of the
+            # original) counts only when it is within 10 percent of the largest: otherwise it is
+            # a side peak of a sustained note, and a renderer cannot play a sound before it.
             peaks = np.zeros(mag.size, dtype=bool)
             peaks[1:-1] = (mag[1:-1] >= mag[:-2]) & (mag[1:-1] >= mag[2:])
             peaks[int(np.argmax(mag))] = True
-            return int(lags[int(np.argmax(peaks & (mag >= 0.5 * mag.max())))])
+            ok = peaks & (mag >= 0.5 * mag.max()) & ((lags >= 0) | (mag >= 0.9 * mag.max()))
+            return int(lags[int(np.argmax(ok))])
         return int(lags[int(np.argmax(mag))])
 
     hop = max(1, int(round(0.0005 * sample_rate)))
@@ -154,8 +158,7 @@ def check_alignment(
         cand = np.concatenate([np.arange(0, k + 1), np.arange(-k, 0)])
         coarse = int(cand[int(np.argmax(xc[cand % m]))]) * hop
         # Early reflections add their own onsets a few milliseconds after the direct sound and
-        # pull the envelope correlation late, so the fine search reaches 3 ms either side and
-        # takes the earliest strong peak, which is the direct sound.
+        # pull the envelope correlation late, so the fine search reaches 3 ms either side.
         refine = int(round(0.003 * sample_rate)) + hop
         lag = best_in(max(-max_lag, coarse - refine), min(max_lag, coarse + refine), banded,
                       earliest=True)

@@ -21,16 +21,17 @@ def app():
     return mod
 
 
-def test_the_only_api_endpoint_is_process(app):
+def test_the_api_endpoints_are_process_and_rerender(app):
     names = [d.api_name for d in app.demo.fns.values()
              if d.api_name and getattr(d, "api_visibility", "public") != "private"]
-    assert names == ["process"]
+    assert names == ["process", "rerender"]
 
 
 def test_profile_choices_cover_every_profile(app):
     from stage.engines import profile_names
 
-    dropdowns = [b for b in app.demo.blocks.values() if isinstance(b, gr.Dropdown)]
+    dropdowns = [b for b in app.demo.blocks.values() if isinstance(b, gr.Dropdown)
+                 and b.label == "Profile"]
     choices = {c[0] if isinstance(c, tuple) else c for c in dropdowns[0].choices}
     assert choices == set(profile_names())
 
@@ -91,8 +92,8 @@ def test_endpoint_through_gradio_client(app, track):
                     allowed_paths=[str(app.WORK_ROOT)])
     try:
         client = gradio_client.Client(app.demo.local_url, verbose=False)
-        job = client.submit(gradio_client.handle_file(str(track)), "lite", "V0", 2.0, None, 1.0,
-                            api_name="/process")
+        job = client.submit(gradio_client.handle_file(str(track)), "lite", "V0", 2.0, "", "1",
+                            "auto", 0.5, "", False, api_name="/process")
         progress, original, spatial, stems, run_json = job.result()
         assert progress["done"] and progress["run"]["ok"]
         assert len(job.outputs()) >= 3  # streamed updates, not one final answer
@@ -100,3 +101,22 @@ def test_endpoint_through_gradio_client(app, track):
         assert sf.info(spatial).subtype == "PCM_24"
     finally:
         app.demo.close()
+
+
+def test_v2_process_then_rerender_from_the_cache(app, track, monkeypatch):
+    *_, last = app.process(str(track), "lite", "space:studio", 2.0, "", "", "pop", 0.4, "",
+                           True)
+    progress = last[0]
+    assert progress["error"] is None and progress["plan"]["genre"] == "pop"
+    assert len(progress["track_id"]) == 24 and Path(progress["files"]["bed_7_1_4"]).exists()
+    plan = progress["plan"]
+    plan["space"] = "club"
+    *_, again = app.rerender(progress["track_id"], "lite", "space:studio", 2.0, "", 0.4,
+                             json.dumps(plan), False)
+    assert again[0]["error"] is None and again[0]["plan"]["space"] == "club"
+    assert "re-rendered from the track cache" in again[0]["notes"]
+
+
+def test_rerender_of_an_unknown_track_is_a_message(app):
+    *_, last = app.rerender("0" * 24, "lite", "space:studio", 2.0, "auto", 0.5, "", False)
+    assert "expired" in last[0]["error"]

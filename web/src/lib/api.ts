@@ -78,6 +78,14 @@ export interface ProcessRequest {
   /** Seconds into the track, or null for "auto": the backend picks the loudest window. */
   start: number | null;
   seconds: number | null;
+  /** A template name, or "auto" for the backend's tagger. */
+  genre?: string;
+  /** Motion depth, 0 (still) to 1. */
+  motion?: number;
+  /** An edited plan to render instead of building one. */
+  plan?: unknown;
+  /** Also write the 7.1.4 bed for producers. */
+  exportBed?: boolean;
 }
 
 export interface BackendInfo {
@@ -272,6 +280,10 @@ export function buildPayload(serverPath: string, fileName: string, req: ProcessR
       // Sent as text: the backend reads an empty field as its default ("auto" start, 30 s).
       req.start === null ? "" : String(req.start),
       req.seconds === null ? "" : String(req.seconds),
+      req.genre ?? "auto",
+      req.motion ?? 0.5,
+      req.plan === undefined ? "" : JSON.stringify(req.plan),
+      req.exportBed ?? false,
     ],
   };
 }

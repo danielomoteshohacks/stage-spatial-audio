@@ -149,6 +149,68 @@ def _write_flac(path: Path, x: NDArray[np.float64], sample_rate: int) -> None:
              subtype=FLAC_SUBTYPE)
 
 
+# --- The track cache -----------------------------------------------------------------------------
+# Separation is the expensive, GPU-bound step, and the analysis and the genre tagger take
+# seconds; a listener who changes the space, the character, the motion or the plan should not pay
+# for them again. They are kept per track (a content hash, decided by stage.service) for the
+# service's time-to-live, as float32 stems in an .npz and the analysis as JSON.
+
+
+def _load_stems(cache: Path | None, sr: int, n: int) -> Separation | None:
+    if cache is None or not (cache / "stems.npz").is_file():
+        return None
+    try:
+        meta = json.loads((cache / "separation.json").read_text(encoding="utf-8"))
+        with np.load(cache / "stems.npz", allow_pickle=False) as z:
+            stems = {k: z[k].astype(np.float64) for k in STEM_NAMES}
+    except (OSError, ValueError, KeyError):
+        return None
+    if meta.get("sample_rate") != sr or any(s.shape != (2, n) for s in stems.values()):
+        return None
+    return Separation(stems=stems, sample_rate=sr, residual_snr_db=meta["residual_snr_db"],
+                      model=meta["model"], device=meta["device"],
+                      notes=[*meta.get("notes", []), "stems from the track cache"],
+                      chain=meta.get("chain", []), details=meta.get("details", {}))
+
+
+def _save_stems(cache: Path | None, sep: Separation) -> None:
+    if cache is None:
+        return
+    np.savez(cache / "stems.npz", **{k: v.astype(np.float32) for k, v in sep.stems.items()})
+    (cache / "separation.json").write_text(json.dumps({
+        "sample_rate": sep.sample_rate, "model": sep.model, "device": sep.device,
+        "residual_snr_db": sep.residual_snr_db if math.isfinite(sep.residual_snr_db) else 1e9,
+        "notes": sep.notes, "chain": sep.chain, "details": sep.details}), encoding="utf-8")
+
+
+def _load_analysis(cache: Path | None, with_stems: bool):
+    from stage.scene.analysis import Section, SongAnalysis
+
+    path = None if cache is None else cache / f"analysis_{'stems' if with_stems else 'mix'}.json"
+    if path is None or not path.is_file():
+        return None
+    d = json.loads(path.read_text(encoding="utf-8"))
+    d["sections"] = [Section(**s) for s in d["sections"]]
+    return SongAnalysis(**d)
+
+
+def _save_analysis(cache: Path | None, song, with_stems: bool) -> None:
+    if cache is not None:
+        (cache / f"analysis_{'stems' if with_stems else 'mix'}.json").write_text(
+            json.dumps(song.as_dict()), encoding="utf-8")
+
+
+def _cached_genre(cache: Path | None) -> dict[str, Any] | None:
+    if cache is None or not (cache / "genre.json").is_file():
+        return None
+    return json.loads((cache / "genre.json").read_text(encoding="utf-8"))
+
+
+def _save_genre(cache: Path | None, chosen: dict[str, Any]) -> None:
+    if cache is not None and not (cache / "genre.json").exists():
+        (cache / "genre.json").write_text(json.dumps(chosen), encoding="utf-8")
+
+
 def run(
     path: str | Path,
     *,
@@ -165,6 +227,8 @@ def run(
     plan: dict[str, Any] | None = None,
     export_bed: bool = False,
     tag_genre: bool = True,
+    cache_dir: str | Path | None = None,
+    track_id: str | None = None,
 ) -> RunResult:
     """Process one file and write original.flac, spatial.flac, stems (stems mode) and run.json.
 
@@ -184,6 +248,9 @@ def run(
         plan: an edited plan.json to render instead of building one (the /rerender path).
         export_bed: also write the 7.1.4 bed and objects as a 12-channel WAV.
         tag_genre: run the AudioSet tagger when no genre is given (where it is installed).
+        cache_dir: the track's cache folder (stage.service): separated stems, the analysis and
+            the excerpt are kept there, so a re-render with other settings never re-separates.
+        track_id: the cache key, written to run.json for /rerender.
     """
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
@@ -211,7 +278,10 @@ def run(
                 start = 0.0
     start = float(start or 0.0)
     sep_fn: Separator = separator or separate_chain
-    track_id = f"{Path(path).stem[:40]}-{start:.1f}s"
+    track_id = track_id or f"{Path(path).stem[:40]}-{start:.1f}s"
+    cache = Path(cache_dir) if cache_dir is not None else None
+    if cache is not None:
+        cache.mkdir(parents=True, exist_ok=True)
     st = _Stages(STAGES, on_stage)
     effective_mode = mode
     fallback: dict[str, str] | None = None
@@ -223,6 +293,7 @@ def run(
         "input": {"name": Path(path).name, "start_s": start, "start_mode": start_mode,
                   "auto_start": auto_info,
                   "requested_seconds": None if seconds is None else float(seconds)},
+        "track_id": track_id,
         "requested_mode": mode,
         "profile": profile,
         "beta": float(beta),
@@ -259,7 +330,16 @@ def run(
         st.skip("separate", "lite mode renders the whole mix")
     else:
         n = audio.shape[1]
-        ok, sep = st.run("separate", lambda: _validate_separation(sep_fn(audio, sr), n))
+        cached = _load_stems(cache, sr, n)
+
+        def _separate() -> Separation:
+            if cached is not None:
+                return cached
+            result = _validate_separation(sep_fn(audio, sr), n)
+            _save_stems(cache, result)
+            return result
+
+        ok, sep = st.run("separate", _separate)
         if not ok:
             effective_mode = "lite"
             fallback = {"from": "stems", "to": "lite", "reason": st.records["separate"].error}
@@ -282,7 +362,10 @@ def run(
     else:
         def _analyse() -> dict[str, Any]:
             stems = sep.stems if sep is not None else None
-            song = analyse_song(audio, sr, stems)
+            song = _load_analysis(cache, sep is not None)
+            if song is None:
+                song = analyse_song(audio, sr, stems)
+                _save_analysis(cache, song, sep is not None)
             report["analysis"] = {"tempo_bpm": round(song.tempo_bpm, 2),
                                   "sections": len(song.sections),
                                   "beats": len(song.beats_s), "method": song.method}
@@ -294,7 +377,8 @@ def run(
             if genre:
                 chosen = {"genre": genre, "scores": {}, "source": "user", "detail": None}
             elif tag_genre:
-                chosen = detect_genre(audio, sr, templates())
+                chosen = _cached_genre(cache) or detect_genre(audio, sr, templates())
+                _save_genre(cache, chosen)
             else:
                 chosen = {"genre": None, "scores": {}, "source": "default",
                           "detail": "tagging off"}
@@ -411,6 +495,8 @@ def run(
         def _write() -> None:
             _write_flac(out / "original.flac", audio, sr)
             outputs["original"] = "original.flac"
+            if cache is not None and not (cache / "original.flac").exists():
+                _write_flac(cache / "original.flac", audio, sr)
             if spatial is None:
                 return
             _write_flac(out / "spatial.flac", spatial, sr)
