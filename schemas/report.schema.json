@@ -4,43 +4,147 @@
   "title": "Stage quality report",
   "description": "Output of the fidelity guard for one render.",
   "type": "object",
-  "required": ["alignment_ms", "downmix_db", "low_end_corr", "loudness_lufs", "true_peak_db", "mono_cancel_db", "verdict", "versions"],
+  "required": [
+    "alignment_ms",
+    "downmix_db",
+    "low_end_corr",
+    "loudness_lufs",
+    "true_peak_db",
+    "mono_cancel_db",
+    "verdict",
+    "versions",
+    "reasons"
+  ],
   "properties": {
-    "alignment_ms": { "type": "number" },
+    "alignment_ms": {
+      "type": "number"
+    },
     "downmix_db": {
       "type": "object",
       "description": "Difference after folding the render to stereo, per frequency band.",
-      "additionalProperties": { "type": "number" }
+      "additionalProperties": {
+        "type": "number"
+      }
     },
-    "low_end_corr": { "type": "number", "minimum": -1, "maximum": 1 },
+    "low_end_corr": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1,
+      "description": "Correlation of the render's and the original's mono low end below 120 Hz."
+    },
     "loudness_lufs": {
       "type": "object",
-      "required": ["original", "render"],
+      "required": [
+        "original",
+        "render"
+      ],
       "properties": {
-        "original": { "type": "number" },
-        "render": { "type": "number" }
+        "original": {
+          "type": "number"
+        },
+        "render": {
+          "type": "number"
+        }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "ITU-R BS.1770-4 integrated loudness; -120 stands for silence."
     },
-    "timbre_deviation_db": { "type": "number", "minimum": 0 },
-    "true_peak_db": { "type": "number" },
-    "mono_cancel_db": { "type": "number" },
+    "timbre_deviation_db": {
+      "type": "number",
+      "minimum": 0
+    },
+    "true_peak_db": {
+      "type": "number",
+      "description": "4x oversampled true peak of the render, dBTP."
+    },
+    "mono_cancel_db": {
+      "type": "number",
+      "description": "Mono-fold power relative to channel power, render minus original (negative: more cancellation)."
+    },
     "artifact_flags": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["start_s", "end_s", "kind"],
+        "required": [
+          "start_s",
+          "end_s",
+          "kind"
+        ],
         "properties": {
-          "start_s": { "type": "number", "minimum": 0 },
-          "end_s": { "type": "number", "minimum": 0 },
-          "kind": { "type": "string" }
+          "start_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "end_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "kind": {
+            "enum": [
+              "clipping",
+              "dropout",
+              "pre_echo",
+              "musical_noise"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          }
         },
         "additionalProperties": false
       }
     },
-    "verdict": { "enum": ["pass", "fail", "review"] },
-    "reasons": { "type": "array", "items": { "type": "string" } },
-    "versions": { "type": "object", "additionalProperties": { "type": "string" } }
+    "verdict": {
+      "enum": [
+        "pass",
+        "fail",
+        "review"
+      ]
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "low_end": {
+      "type": "object",
+      "required": [
+        "identity_corr",
+        "level_db",
+        "render_lr_corr",
+        "original_lr_corr"
+      ],
+      "properties": {
+        "identity_corr": {
+          "type": "number"
+        },
+        "level_db": {
+          "type": "number"
+        },
+        "render_lr_corr": {
+          "type": "number"
+        },
+        "original_lr_corr": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "timbre_bands_db": {
+      "type": "object",
+      "description": "Per 1/3-octave band deviation (render minus original, after the level offset), keyed by nominal centre.",
+      "additionalProperties": {
+        "type": "number"
+      }
+    }
   },
   "additionalProperties": false
 }

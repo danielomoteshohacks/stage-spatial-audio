@@ -10,6 +10,8 @@ rm -rf "$out"
 mkdir -p "$out"
 cp "$here/app.py" "$here/README.md" "$here/requirements.txt" "$out/"
 cp -R "$root/src/stage" "$out/stage"
+# Thresholds, templates and room presets are data the package reads at run time (stage.config).
+cp -R "$root/configs" "$out/stage/configs"
 find "$out" -name "__pycache__" -type d -prune -exec rm -rf {} +
 echo "bundle ready in $out:"
 (cd "$out" && find . -type f | sort)

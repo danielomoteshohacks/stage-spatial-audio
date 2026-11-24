@@ -43,7 +43,7 @@ jobs:
         run: |
           ./space/bundle.sh "$RUNNER_TEMP/space-bundle"
           cd "$RUNNER_TEMP/space-bundle"
-          python -c "import app, stage; assert stage.__file__.startswith('$RUNNER_TEMP'), stage.__file__; print('bundle ok')"
+          python -c "import app, stage; from stage.config import config_dir, threshold_values; assert stage.__file__.startswith('$RUNNER_TEMP'), stage.__file__; assert str(config_dir()).startswith('$RUNNER_TEMP'), config_dir(); threshold_values(); print('bundle ok')"
 
   web:
     runs-on: ubuntu-latest
