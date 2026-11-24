@@ -4,6 +4,13 @@
         --engines ssep,htdemucs,htdemucs_ft --ssep /kaggle/working/ssep \\
         --out eval.json [--limit 50] [--update-card /kaggle/working/ssep/model.json]
 
+Also reports the two MVSep leaderboard metrics, bleedless and fullness (stage.metrics.separation,
+re-implemented from the published open definition and checked against it to 1e-7), per stem; the
+generated ground-truth songs are scored per leaf with --groundtruth, and a cascade engine
+(`cascade:best`, `cascade:fast`, `cascade:cpu`) reports its GPU seconds per minute of audio:
+
+    python scripts/eval_separation.py --groundtruth 2 --engines dsp,cascade:fast --out gt.json
+
 Metric: museval's BSSEval v4 (Stoter, Liutkus and Ito 2018, "The 2018 Signal Separation
 Evaluation Campaign"): SDR, SIR and SAR on 1 s windows, the median over windows per track, then
 the median over tracks, per stem; the average SDR is the mean of the four stem medians, the
@@ -30,6 +37,7 @@ import soundfile as sf
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from stage.metrics.separation import best_stem_for, bleed_full, sdr_db  # noqa: E402
 from stage.separation.ssep.config import STEMS  # noqa: E402
 
 
@@ -40,8 +48,30 @@ def load_track(folder: Path) -> tuple[np.ndarray, dict[str, np.ndarray], int]:
     return mix.T, refs, sr
 
 
+def cascade_engine(spec: str):
+    """(separate fn, gpu_seconds fn, description) for `cascade:<preset>`."""
+    from stage.separation.cascade import config as cc
+    from stage.separation.cascade.neural import NeuralEngine
+    from stage.separation.cascade.tree import Cascade, collapse_to_four
+
+    preset = spec.split(":", 1)[1]
+    specs = cc.models()
+    wanted = [m for ids in cc.preset(preset)["levels"].values() if isinstance(ids, list)
+              for m in ids]
+    engines = {m: NeuralEngine(specs[m]) for m in wanted}
+    casc = Cascade(preset, engines=engines)
+
+    def separate(audio, sr):
+        return collapse_to_four(casc.run(audio, sr))
+
+    return separate, (lambda: sum(e.gpu_seconds for e in engines.values())), f"cascade ({preset})"
+
+
 def engine(name: str, ssep_dir: str | None):
     """(separate(audio, sr) -> stems dict, parameter count, description)."""
+    if name.startswith("cascade:"):
+        fn, _, desc = cascade_engine(name)
+        return fn, None, desc
     if name == "ssep":
         from stage.separation.ssep.infer import OnnxSeparator
 
@@ -70,24 +100,83 @@ def metrics(refs: dict[str, np.ndarray], est: dict[str, np.ndarray], sr: int
             num = np.sum(refs[s] ** 2)
             den = np.sum((refs[s] - est[s]) ** 2) + 1e-12
             out[s] = {"SDR": float(10 * np.log10(num / den + 1e-12))}
+            out[s]["bleedless"], out[s]["fullness"] = bleed_full(refs[s], est[s], sr)
         return out, "plain SDR (museval not installed; not comparable with the papers)"
     ref = np.stack([refs[s].T for s in STEMS])
     es = np.stack([est[s].T for s in STEMS])
     sdr, _isr, sir, sar = museval.evaluate(ref, es, win=sr, hop=sr)
+    bf = {s: bleed_full(refs[s], est[s], sr) for s in STEMS}
     return ({s: {"SDR": float(np.nanmedian(sdr[i])), "SIR": float(np.nanmedian(sir[i])),
-                 "SAR": float(np.nanmedian(sar[i]))} for i, s in enumerate(STEMS)},
+                 "SAR": float(np.nanmedian(sar[i])), "bleedless": bf[s][0],
+                 "fullness": bf[s][1]} for i, s in enumerate(STEMS)},
             "museval BSSEval v4, median over 1 s windows, median over tracks")
+
+
+def groundtruth(args: argparse.Namespace) -> None:
+    """Per-leaf scores of each engine on the generated object songs (stage.groundtruth)."""
+    from stage.groundtruth import make_object_song
+    from stage.separation.cascade import dsp
+
+    rows = []
+    for seed in range(args.groundtruth):
+        song = make_object_song(seed=seed, tempo_bpm=(112.0, 124.0, 98.0)[seed % 3])
+        sr = song.sample_rate
+        a, b = int(args.start * sr), int((args.start + args.seconds) * sr)
+        mix = song.mix[:, a:b]
+        refs = {k: v[:, a:b] for k, v in song.stereo.items()
+                if float(np.sum(v[:, a:b] ** 2)) > 1e-6}
+        for name in args.engines.split(","):
+            gpu = None
+            t0 = time.perf_counter()
+            if name == "dsp":
+                four = {k: v[:, a:b] for k, v in song.four_stems().items()}
+                leaves = dsp.dsp_cascade(mix, sr, four).leaves
+            else:
+                fn, gpu_s, _ = cascade_engine(name)
+                from stage.separation.cascade.tree import Cascade  # noqa: F401
+
+                res = fn(mix, sr)
+                leaves = res
+                gpu = gpu_s()
+            wall = time.perf_counter() - t0
+            for leaf, ref in refs.items():
+                est = leaves[best_stem_for(ref, leaves)]
+                bl, fu = bleed_full(ref, est, sr)
+                rows.append({"song": seed, "engine": name, "leaf": leaf,
+                             "sdr_db": round(sdr_db(ref, est), 2), "bleedless": round(bl, 1),
+                             "fullness": round(fu, 1), "wall_s": round(wall, 1),
+                             "gpu_s_per_min": None if gpu is None else round(
+                                 gpu / (args.seconds / 60.0), 2)})
+    Path(args.out).write_text(json.dumps(rows, indent=2), encoding="utf-8")
+    print("\n| Engine | Leaf | SDR (plain) | Bleedless | Fullness |\n|---|---|---|---|---|")
+    for name in args.engines.split(","):
+        for leaf in sorted({r["leaf"] for r in rows}):
+            sel = [r for r in rows if r["engine"] == name and r["leaf"] == leaf]
+            if sel:
+                print(f"| {name} | {leaf} | {np.mean([r['sdr_db'] for r in sel]):.1f} | "
+                      f"{np.mean([r['bleedless'] for r in sel]):.1f} | "
+                      f"{np.mean([r['fullness'] for r in sel]):.1f} |")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--musdb", required=True, help="MUSDB18-HQ test folder")
-    ap.add_argument("--engines", default="ssep,htdemucs,htdemucs_ft")
+    ap.add_argument("--musdb", help="MUSDB18-HQ test folder")
+    ap.add_argument("--groundtruth", type=int, default=0,
+                    help="score the generated object songs per leaf instead (this many songs)")
+    ap.add_argument("--seconds", type=float, default=30.0)
+    ap.add_argument("--start", type=float, default=26.0)
+    ap.add_argument("--engines", default="ssep,htdemucs,htdemucs_ft",
+                    help="ssep, htdemucs names, cascade:<preset>, and for --groundtruth also dsp")
     ap.add_argument("--ssep", help="folder with model.onnx and model.json")
     ap.add_argument("--limit", type=int, default=0, help="first N tracks only (0 = all 50)")
     ap.add_argument("--out", default="eval_separation.json")
     ap.add_argument("--update-card", help="model.json to write the averages into")
     args = ap.parse_args()
+    if args.groundtruth:
+        groundtruth(args)
+        return
+    if not args.musdb:
+        ap.error("give --musdb or --groundtruth")
     tracks = sorted(p for p in Path(args.musdb).iterdir() if (p / "mixture.wav").is_file())
     if args.limit:
         tracks = tracks[: args.limit]

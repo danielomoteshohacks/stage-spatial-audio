@@ -148,3 +148,26 @@ def test_truth_binaural_places_a_left_leaf_louder_in_the_left_ear():
     yl = only.truth_binaural()
     assert np.sum(yl[0] ** 2) > 2 * np.sum(yl[1] ** 2)
     assert gl[0].std() > gl[1].std()
+
+
+def test_bleedless_and_fullness_follow_their_definitions():
+    from stage.metrics.separation import bleed_full, mel_filterbank
+
+    sr = 22050
+    rng = np.random.default_rng(0)
+    t = np.arange(sr * 2) / sr
+    ref = np.stack([np.sin(2 * np.pi * 440 * t), np.sin(2 * np.pi * 660 * t)]) * 0.5
+    ref = ref + 0.01 * rng.standard_normal(ref.shape)
+    b0, f0 = bleed_full(ref, ref, sr=sr, n_fft=2048, hop=512, n_mels=128)
+    assert b0 == pytest.approx(100.0) and f0 == pytest.approx(100.0)
+    # Bleed: another source added on top lowers bleedless and leaves fullness near 100.
+    other = 0.3 * np.stack([np.sin(2 * np.pi * 3000 * t)] * 2)
+    b1, f1 = bleed_full(ref, ref + other, sr=sr, n_fft=2048, hop=512, n_mels=128)
+    assert b1 < 60 and f1 > 90
+    # Missing content: a lowpassed estimate lowers fullness and leaves bleedless high.
+    from scipy.signal import butter, sosfiltfilt
+    low = sosfiltfilt(butter(4, 500, "lowpass", fs=sr, output="sos"), ref, axis=-1)
+    b2, f2 = bleed_full(ref, low, sr=sr, n_fft=2048, hop=512, n_mels=128)
+    assert f2 < 60 and b2 > f2
+    fb = mel_filterbank(sr, 2048, 128)
+    assert fb.shape == (128, 1025) and (fb >= 0).all() and fb.sum(axis=1).min() > 0

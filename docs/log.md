@@ -426,3 +426,60 @@ room that carries 62% of the energy.
 ### Next
 
 Phase 1: the separation cascade.
+
+## 2026-11-24: v3 Phase 1, the separation cascade
+
+### Done
+
+- Research record `docs/research/separation-v3.md`: BS-RoFormer, Mel-Band RoFormer, SDX'23, the
+  MVSep benchmarks and ensembles, and the 2025 Music Source Restoration winner (SJTU X-LANCE),
+  each tagged established or speculative; licences read at the source and recorded in
+  `models/MANIFEST.md` and `configs/cascade/models.json`.
+- `stage.separation.cascade`: the six levels (adress, dsp kit and vocal rules, ensemble by band
+  with fitted weights, dereverb with the 10 dB guard, chunked fp16 runner with exact cross-fade,
+  neural engines with SHA-256-checked downloads), the post-processing layer (multichannel Wiener,
+  mixture consistency, bleed suppression, musical-noise detection and repair, transient
+  restoration, leaf quality score and merge), the tree with a per-level content-hash cache and
+  `fast`/`best`/`cpu` presets (decision 0023).
+- `stage.metrics.separation.bleed_full`: bleedless and fullness from the published open
+  definition, parity with a line-by-line reimplementation of the original to 1e-7; wired into
+  `scripts/eval_separation.py` with per-leaf scoring on the generated songs and a cascade engine.
+- `scripts/measure_cascade.py` for GPU seconds per audio minute on the Space.
+- The ssep teacher is now the cascade (training README, `make_teacher_stems.py --teacher`, the
+  Kaggle notebook); the gate is unchanged.
+
+### Measured
+
+Model-free levels on the generated ground-truth songs (leaky four-stem input, mean plain SDR over
+14 leaves): none -2.18 dB, Wiener +0.45, Wiener then targeted repair then consistency -0.08;
+bleed suppression and transient restoration do not help and are off by default (table in the
+research record). ADRess on a double-tracked guitar pair: 5.5 and 5.3 dB (oracle ratio mask 21.9).
+With perfect stems the layer makes things worse, which is why it runs only on estimates. Musical-
+noise detector: clean leaf 5, soft azimuth masks 6, hard pan mask 11, random mask 150 to 180
+flickering tiles per thousand. On the ground-truth songs with true stems into the model-free
+levels: lead vocal 1.8 dB, kick 10.5, bass 10.5, snare 4.1, hi-hat 4.5, guitars -6, pads -3.4
+(they share one stem and one pan): the model levels exist for exactly these.
+
+### What went wrong
+
+- The brief expected BS-RoFormer SW to be CC BY-NC-SA. It has no stated licence at all (its
+  author's repository was removed; every copy says "unknown"). It is `unverified` and off by
+  default; the cascade falls back to htdemucs 6-stem (MIT) at level 3.
+- The dereverb model is trained on dry mono single voices and removes non-centre harmonies, so
+  the brief's "dereverb every melodic stem" is not what a model can do; vocals get the model, the
+  other stems the model-free subtractor, both guarded.
+- The first Wiener re-estimated the spectral densities too and let the bass drift into leaves
+  that share its pan (bass 232 to 9.6 dB with perfect input); fixed by holding the densities
+  fixed, as norbert does.
+- The first musical-noise detector (isolated peaks in the leaf's spectrogram) read 1669 specks a
+  second on a clean leaf and 0.2 on a random mask: resynthesis smooths specks across tiles.
+  Replaced by a detector on the ratio mask, which separates 5 from 150.
+- ZeroGPU quota: the figures found disagree (3.5 to 5 GPU-minutes a day free, 25 to 40 PRO, none
+  official for anonymous visitors); GPU seconds per minute of audio are NOT measured, because
+  this session has no GPU. Nothing neural ran here: the checkpoint hosts are not on the session's
+  network allow-list. The loader is tested with a tiny random network saved and reloaded through
+  the same path.
+
+### Next
+
+Phase 2: the object renderer, the dry stage and the placement engine.

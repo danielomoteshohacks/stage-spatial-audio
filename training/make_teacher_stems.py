@@ -8,9 +8,14 @@ other as 44.1 kHz float WAV under <out>/<track>/. With several --models the stem
 which is the ensemble; each model is downloaded by the demucs package on the machine that runs
 this (a Kaggle GPU), never on a phone. Teachers are used only here, never shipped.
 
-Teacher licences (decision 0015): htdemucs_ft comes with the demucs repository (MIT). A RoFormer
-teacher can be added the same way once a checkpoint with a confirmed permissive licence is
-chosen; none is confirmed yet, so the default ensemble is htdemucs_ft alone.
+Teachers (decisions 0015 and 0023). `--teacher htdemucs_ft` is the original: htdemucs_ft from the
+demucs repository (MIT). `--teacher cascade:best` (or `cascade:fast`) is the v3 teacher: the whole
+separation cascade (vocal RoFormer ensemble, 6-stem model, dereverberation, post-processing),
+collapsed to the four stems the separator learns, so the student is distilled from the strongest
+open pipeline rather than from one model. The cascade's models carry GPL-3.0 or CC BY-NC-SA
+weights (models/MANIFEST.md); the student's weights are research-only already (MUSDB18-HQ) and
+stay so until the owner confirms the terms of every teacher in writing. The student is never the
+cascade: the cascade runs on the Space's GPU, the student on a phone's CPU.
 """
 
 from __future__ import annotations
@@ -45,11 +50,24 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--input", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--models", default="htdemucs_ft")
+    ap.add_argument("--models", default="htdemucs_ft",
+                    help="demucs models, averaged (used when --teacher is htdemucs)")
+    ap.add_argument("--teacher", default="htdemucs", help="htdemucs, or cascade:<preset>")
     ap.add_argument("--mixture-name", default="mixture.wav")
     args = ap.parse_args()
     out = Path(args.out)
     models = args.models.split(",")
+    cascade = None
+    if args.teacher.startswith("cascade:"):
+        from stage.separation.cascade import config as cc
+        from stage.separation.cascade.neural import NeuralEngine
+        from stage.separation.cascade.tree import Cascade, collapse_to_four
+
+        preset = args.teacher.split(":", 1)[1]
+        specs = cc.models()
+        wanted = [m for ids in cc.preset(preset)["levels"].values() if isinstance(ids, list)
+                  for m in ids]
+        cascade = Cascade(preset, engines={m: NeuralEngine(specs[m]) for m in wanted})
     for name, path in sources(Path(args.input), args.mixture_name):
         target = out / name
         if all((target / f"{s}.wav").is_file() for s in STEMS):
@@ -57,16 +75,21 @@ def main() -> None:
         audio, sr = sf.read(str(path), dtype="float64", always_2d=True)
         audio = audio.T if audio.shape[1] == 2 else np.repeat(audio.T[:1], 2, axis=0)
         acc = {s: np.zeros_like(audio) for s in STEMS}
-        for m in models:
-            sep = separate(audio, sr, model=m, device="auto")
+        if cascade is not None:
+            res = collapse_to_four(cascade.run(audio, sr))
             for s in STEMS:
-                acc[s] += sep.stems[s] / len(models)
+                acc[s] = res[s]
+        else:
+            for m in models:
+                sep = separate(audio, sr, model=m, device="auto")
+                for s in STEMS:
+                    acc[s] += sep.stems[s] / len(models)
         target.mkdir(parents=True, exist_ok=True)
         for s in STEMS:
             sf.write(str(target / f"{s}.wav"), acc[s].T.astype(np.float32), sr, subtype="FLOAT")
         if not (target / "mixture.wav").exists():
             sf.write(str(target / "mixture.wav"), audio.T.astype(np.float32), sr, subtype="FLOAT")
-        print(f"{name}: done with {models}", flush=True)
+        print(f"{name}: done with {args.teacher if cascade else models}", flush=True)
 
 
 if __name__ == "__main__":

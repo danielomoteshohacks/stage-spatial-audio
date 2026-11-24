@@ -16,9 +16,10 @@ at its true position; the release is the stereo fold; the engine under test sees
 * per-object direct-to-reverberant ratio, IACC, and the guard verdict.
 
 Separators: `oracle` hands over the true four stems (an upper bound on what any four-stem
-separator can give, isolating the renderer); `dsp` is the model-free cascade levels of
-stage.separation.cascade (azimuth split and the post-processing layer); neural levels need the
-Space's GPU and are scored by running this script there (docs/research/separation-v3.md).
+separator can give, isolating the renderer); `dsp` hands the true four stems to the model-free
+cascade levels of stage.separation.cascade (azimuth split, kit rules and the post-processing
+layer); neural levels need the Space's GPU and are scored by running this script there
+(docs/research/separation-v3.md).
 """
 
 from __future__ import annotations
@@ -105,8 +106,9 @@ def run_engine(engine: str, song: ObjectSong, a: int, b: int, separator: str) ->
     else:
         from stage.separation.cascade.dsp import dsp_cascade
 
-        casc = dsp_cascade(mix, sr)
-        stems, leaves = casc.stems, casc.leaves
+        stems = {k: v[:, a:b] for k, v in song.four_stems().items()}
+        casc = dsp_cascade(mix, sr, stems)
+        leaves = casc.leaves
         mode = "stems"
     t0 = time.perf_counter()
     if engine == "v2":

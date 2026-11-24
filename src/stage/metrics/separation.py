@@ -92,3 +92,68 @@ def map_distance_deg(a: DirectionMap, b: DirectionMap, step_deg: float = 30.0) -
     if not res.success:
         raise RuntimeError(f"transport problem failed: {res.message}")
     return float(res.fun)
+
+
+# --- Bleedless and fullness (the MVSep leaderboard metrics) --------------------------------------
+
+
+def mel_filterbank(sr: int, n_fft: int, n_mels: int) -> NDArray[np.float64]:
+    """Triangular mel filters on the Slaney scale with Slaney area normalisation, the default
+    of librosa.filters.mel, which the published implementation uses."""
+    def hz_to_mel(f):
+        f = np.asarray(f, dtype=np.float64)
+        lin = f / (200.0 / 3.0)
+        log_t = 1000.0 / (200.0 / 3.0)
+        logstep = np.log(6.4) / 27.0
+        return np.where(f >= 1000.0, log_t + np.log(np.maximum(f, 1e-9) / 1000.0) / logstep, lin)
+
+    def mel_to_hz(m):
+        m = np.asarray(m, dtype=np.float64)
+        log_t = 1000.0 / (200.0 / 3.0)
+        logstep = np.log(6.4) / 27.0
+        return np.where(m >= log_t, 1000.0 * np.exp(logstep * (m - log_t)), (200.0 / 3.0) * m)
+
+    fft_f = np.fft.rfftfreq(n_fft, 1.0 / sr)
+    mel_f = mel_to_hz(np.linspace(hz_to_mel(0.0), hz_to_mel(sr / 2.0), n_mels + 2))
+    fdiff = np.diff(mel_f)
+    ramps = mel_f[:, None] - fft_f[None, :]
+    lower = -ramps[:-2] / fdiff[:-1, None]
+    upper = ramps[2:] / fdiff[1:, None]
+    weights = np.maximum(0.0, np.minimum(lower, upper))
+    weights *= (2.0 / (mel_f[2 : n_mels + 2] - mel_f[:n_mels]))[:, None]
+    return weights
+
+
+def _mel_db(x: NDArray, sr: int, n_fft: int, hop: int, n_mels: int, top_db: float = 80.0
+            ) -> NDArray:
+    from scipy.signal import stft as sp_stft
+
+    window = np.hanning(n_fft + 1)[:-1]
+    _, _, z = sp_stft(x, window=window, nperseg=n_fft, noverlap=n_fft - hop, boundary="zeros",
+                      padded=False, return_onesided=True, scaling="spectrum")
+    mag = np.abs(z) * (window.sum())  # undo the "spectrum" scaling: plain |STFT|
+    mel = np.einsum("mf,cft->cmt", mel_filterbank(sr, n_fft, n_mels), mag)
+    db = 20.0 * np.log10(np.maximum(mel, 1e-10))
+    return np.maximum(db, db.max() - top_db)
+
+
+def bleed_full(reference: NDArray, estimate: NDArray, sr: int = 44100, n_fft: int = 4096,
+               hop: int = 1024, n_mels: int = 512) -> tuple[float, float]:
+    """(bleedless, fullness), both 0 to 100, higher is better.
+
+    From the published definition (the open `bleed_full` of ZFTurbo's Music-Source-Separation-
+    Training utils/metrics.py, MIT, which MVSep's quality checker reports): mel spectrograms of
+    reference and estimate in dB (floor 80 dB below the loudest tile); wherever the estimate is
+    louder than the reference (positive difference, content that should not be there: bleed) the
+    mean excess gives bleedless = 100 / (mean + 1); wherever it is quieter (negative difference,
+    content that is missing) the mean shortfall gives fullness = 100 / (mean + 1). Identical
+    signals score 100 on both.
+    """
+    d1 = _mel_db(np.asarray(reference, dtype=np.float64), sr, n_fft, hop, n_mels)
+    d2 = _mel_db(np.asarray(estimate, dtype=np.float64), sr, n_fft, hop, n_mels)
+    diff = d2 - d1
+    pos = diff[diff > 0]
+    neg = diff[diff < 0]
+    avg_pos = float(pos.mean()) if pos.size else 0.0
+    avg_neg = float(neg.mean()) if neg.size else 0.0
+    return 100.0 / (avg_pos + 1.0), 100.0 / (-avg_neg + 1.0)
