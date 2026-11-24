@@ -32,7 +32,7 @@ from stage import __version__  # noqa: E402
 from stage.engines import DEFAULT_PROFILE, profile_names  # noqa: E402
 from stage.pipeline import DEFAULT_MOTION, MODES, STAGES  # noqa: E402
 from stage.render.sectors import WIDEN_BETA_MAX, WIDEN_BETA_MIN  # noqa: E402
-from stage.scene.plan import templates  # noqa: E402
+from stage.scene.plan import CHARACTERS, templates  # noqa: E402
 from stage.separation.chain import separate_chain  # noqa: E402
 from stage.separation.demucs_sep import Separation, separate  # noqa: E402
 from stage.service import (  # noqa: E402
@@ -84,7 +84,7 @@ def _progress(stages: dict[str, dict[str, Any]], **extra: Any) -> dict[str, Any]
 
 
 def _options(mode, profile, beta, genre, motion, plan_text, export_bed, start=None,
-             seconds=None) -> ServiceOptions:
+             seconds=None, character="balanced") -> ServiceOptions:
     """Form values to service options. Text and numbers are both accepted (older clients send
     numbers); the service validates everything and answers with a message, never a crash."""
     plan = None
@@ -95,7 +95,7 @@ def _options(mode, profile, beta, genre, motion, plan_text, export_bed, start=No
         beta=float(beta) if beta is not None else 2.0, start=start, seconds=seconds,
         genre=None if genre in (None, "", "auto") else str(genre),
         motion=DEFAULT_MOTION if motion in (None, "") else float(motion),
-        plan=plan, export_bed=bool(export_bed),
+        plan=plan, export_bed=bool(export_bed), character=character or "balanced",
     )
 
 
@@ -136,7 +136,7 @@ def _fresh_stages() -> dict[str, dict[str, Any]]:
 
 
 def process(audio_file, mode, profile, beta, start, seconds, genre="auto",
-            motion=DEFAULT_MOTION, plan="", export_bed=False):
+            motion=DEFAULT_MOTION, plan="", export_bed=False, character="balanced"):
     """Stream stage progress, then return original, spatial, spatial stems and run.json."""
     stages = _fresh_stages()
     if not audio_file:
@@ -144,7 +144,8 @@ def process(audio_file, mode, profile, beta, start, seconds, genre="auto",
         return
     path = audio_file if isinstance(audio_file, str) else getattr(audio_file, "name", audio_file)
     try:
-        options = _options(mode, profile, beta, genre, motion, plan, export_bed, start, seconds)
+        options = _options(mode, profile, beta, genre, motion, plan, export_bed, start, seconds,
+                           character)
     except (ValueError, TypeError) as exc:
         yield (_progress(stages, done=True, error=f"The settings were not understood: {exc}"),
                None, None, None, None)
@@ -154,11 +155,12 @@ def process(audio_file, mode, profile, beta, start, seconds, genre="auto",
 
 
 def rerender(track_id, mode, profile, beta, genre="auto", motion=DEFAULT_MOTION, plan="",
-             export_bed=False):
+             export_bed=False, character="balanced"):
     """Render a cached track again with new settings or an edited plan. No upload, no GPU."""
     stages = _fresh_stages()
     try:
-        options = _options(mode, profile, beta, genre, motion, plan, export_bed)
+        options = _options(mode, profile, beta, genre, motion, plan, export_bed,
+                           character=character)
     except (ValueError, TypeError) as exc:
         yield (_progress(stages, done=True, error=f"The settings were not understood: {exc}"),
                None, None, None, None)
@@ -199,6 +201,8 @@ def build() -> gr.Blocks:
                                    label="Motion depth", info="0 is a still scene.")
                 plan = gr.Textbox(value="", label="Plan (JSON, optional)", lines=2)
                 export_bed = gr.Checkbox(value=False, label="Also write the 7.1.4 bed (WAV)")
+                character = gr.Radio(list(CHARACTERS), value="balanced", label="Character",
+                                     info="How far the scene opens around you.")
                 go = gr.Button("Process", variant="primary")
                 track_id = gr.Textbox(value="", label="Track id (for re-render)")
                 again = gr.Button("Re-render")
@@ -210,9 +214,10 @@ def build() -> gr.Blocks:
                 run_json = gr.File(label="run.json")
         outputs = [progress, original, spatial, stems, run_json]
         go.click(process, [audio, mode, profile, beta, start, seconds, genre, motion, plan,
-                           export_bed], outputs, api_name="process", concurrency_limit=1)
-        again.click(rerender, [track_id, mode, profile, beta, genre, motion, plan, export_bed],
-                    outputs, api_name="rerender", concurrency_limit=1)
+                           export_bed, character], outputs, api_name="process",
+                 concurrency_limit=1)
+        again.click(rerender, [track_id, mode, profile, beta, genre, motion, plan, export_bed,
+                               character], outputs, api_name="rerender", concurrency_limit=1)
     # One job at a time: a render holds whole-signal arrays, and the GPU quota is per visitor.
     demo.queue(default_concurrency_limit=1, max_size=16)
     return demo

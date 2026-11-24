@@ -25,6 +25,10 @@ from stage.config import config_dir, load_json
 from stage.scene.analysis import SongAnalysis
 
 PLAN_VERSION = 2
+#: Character: how far the scene opens around the listener. Multipliers for the bed (ambience,
+#: heights) and every object's room send. "balanced" is the template as written.
+CHARACTERS = {"intimate": (0.6, 0.5, 0.6), "balanced": (1.0, 1.0, 1.0),
+              "immersive": (1.35, 1.4, 1.3)}
 #: Speed cap for moving sources. Rotating sound fields can induce illusory self-motion (auditory
 #: vection) and discomfort in some listeners, with effects reported for rotation speeds of tens of
 #: degrees per second and above (Valjamae 2009, "Auditorily-induced illusory self-motion: a
@@ -91,11 +95,14 @@ def section_openness(analysis: SongAnalysis, template: dict[str, Any]) -> list[d
 
 def build_plan(analysis: SongAnalysis, *, track_id: str, mode: str, genre: str | None,
                space: str | None, motion_depth: float, crossover_hz: float = 120.0,
-               genre_source: str = "default", genre_scores: dict[str, float] | None = None
-               ) -> dict[str, Any]:
+               genre_source: str = "default", genre_scores: dict[str, float] | None = None,
+               character: str = "balanced") -> dict[str, Any]:
     """The plan for one excerpt. `mode` is "stems" or "lite"; `space` None takes the template's."""
     if not 0.0 <= motion_depth <= 1.0:
         raise ValueError("motion depth must be between 0 and 1")
+    if character not in CHARACTERS:
+        raise ValueError(f"character must be one of {sorted(CHARACTERS)}")
+    bed_k, height_k, room_k = CHARACTERS[character]
     genre = genre or DEFAULT_GENRE
     template = get_template(genre)
     tempo = analysis.tempo_bpm if analysis.tempo_bpm > 0 else 120.0
@@ -110,7 +117,11 @@ def build_plan(analysis: SongAnalysis, *, track_id: str, mode: str, genre: str |
             if capped:
                 o["motion"] = capped
         o.setdefault("mono_below_hz", crossover_hz)
+        o["room_send"] = round(min(1.0, float(o["room_send"]) * room_k), 3)
         out_objects.append(o)
+    bed = dict(template.get("bed", {"ambience": 1.0, "heights": 0.5}))
+    bed = {"ambience": round(min(2.0, bed.get("ambience", 1.0) * bed_k), 3),
+           "heights": round(min(2.0, bed.get("heights", 0.5) * height_k), 3)}
     first_downbeat = analysis.downbeats_s[0] if analysis.downbeats_s else 0.0
     return {
         "version": PLAN_VERSION,
@@ -128,7 +139,8 @@ def build_plan(analysis: SongAnalysis, *, track_id: str, mode: str, genre: str |
         "tempo_bpm": round(float(tempo), 3),
         "first_downbeat_s": round(float(first_downbeat), 3),
         "sections": section_openness(analysis, template),
-        "bed": dict(template.get("bed", {"ambience": 1.0, "heights": 0.5})),
+        "character": character,
+        "bed": bed,
         "stems": out_objects,
         "protected": [o["name"] for o in out_objects if o.get("protected")],
         "room": {"predelay_ms": 0.0},

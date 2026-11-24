@@ -265,6 +265,13 @@
       "items": {
         "type": "string"
       }
+    },
+    "character": {
+      "enum": [
+        "intimate",
+        "balanced",
+        "immersive"
+      ]
     }
   },
   "additionalProperties": false

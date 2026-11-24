@@ -227,6 +227,7 @@ def run(
     plan: dict[str, Any] | None = None,
     export_bed: bool = False,
     tag_genre: bool = True,
+    character: str = "balanced",
     cache_dir: str | Path | None = None,
     track_id: str | None = None,
 ) -> RunResult:
@@ -386,7 +387,7 @@ def run(
             return build_plan(song, track_id=track_id, mode="stems" if sep else "lite",
                               genre=chosen["genre"], space=profile[len("space:"):],
                               motion_depth=float(motion), genre_source=chosen["source"],
-                              genre_scores=chosen["scores"]), song
+                              genre_scores=chosen["scores"], character=character), song
         ok, made = st.run("analyse", _analyse)
         if ok:
             scene_plan, song = made if isinstance(made, tuple) else (made, None)

@@ -28,7 +28,7 @@ from stage import pipeline
 from stage.engines import DEFAULT_PROFILE, profile_names
 from stage.pipeline import MODES, Separator
 from stage.render.sectors import WIDEN_BETA_MAX, WIDEN_BETA_MIN
-from stage.scene.plan import templates, validate_plan
+from stage.scene.plan import CHARACTERS, templates, validate_plan
 
 ALLOWED_EXTENSIONS = (".wav", ".flac", ".mp3", ".ogg", ".m4a")
 MAX_TRACK_S = 12 * 60.0
@@ -59,6 +59,7 @@ class ServiceOptions:
     motion: float = pipeline.DEFAULT_MOTION
     plan: dict[str, Any] | None = None  # an edited plan.json to render
     export_bed: bool = False
+    character: str = "balanced"  # intimate, balanced or immersive
 
 
 @dataclass
@@ -263,6 +264,8 @@ def validate_options(options: ServiceOptions) -> None:
         raise ValidationError("Motion must be a number from 0 to 1.") from None
     if not 0.0 <= motion <= 1.0:
         raise ValidationError("Motion must be between 0 (still) and 1 (full).")
+    if (options.character or "balanced") not in CHARACTERS:
+        raise ValidationError(f"Character must be one of: {', '.join(CHARACTERS)}.")
     if options.plan is not None:
         try:
             validate_plan(options.plan)
@@ -316,6 +319,7 @@ def _run(readable: Path, options: ServiceOptions, run_dir: Path, *, start, secon
         start=start, seconds=seconds, out_dir=run_dir / "out", separator=separator,
         on_stage=on_stage, genre=options.genre or None, motion=float(options.motion),
         plan=options.plan, export_bed=bool(options.export_bed), cache_dir=cache, track_id=key,
+        character=options.character or "balanced",
     )
 
 

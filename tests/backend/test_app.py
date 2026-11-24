@@ -93,7 +93,7 @@ def test_endpoint_through_gradio_client(app, track):
     try:
         client = gradio_client.Client(app.demo.local_url, verbose=False)
         job = client.submit(gradio_client.handle_file(str(track)), "lite", "V0", 2.0, "", "1",
-                            "auto", 0.5, "", False, api_name="/process")
+                            "auto", 0.5, "", False, "balanced", api_name="/process")
         progress, original, spatial, stems, run_json = job.result()
         assert progress["done"] and progress["run"]["ok"]
         assert len(job.outputs()) >= 3  # streamed updates, not one final answer
