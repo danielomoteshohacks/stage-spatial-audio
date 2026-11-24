@@ -1,0 +1,125 @@
+{
+  "label": "Afrobeats",
+  "space": "living_room",
+  "why": "Afrobeats grooves are built from interlocking percussion around a steady kick and bass; mixes keep the kick and the lead vocal centred and dry and spread shakers, congas and guitars wide. A ring of percussion puts the listener inside the groove while the vocal stays intimate.",
+  "audioset": [
+    "Afrobeat",
+    "Music of Africa",
+    "Reggae",
+    "Dancehall"
+  ],
+  "objects": [
+    {
+      "name": "lead_vocal",
+      "source": "vocals.direct",
+      "az": 0,
+      "el": 0,
+      "dist": 0.8,
+      "spread": 10,
+      "room_send": 0.12,
+      "orig_blend": 0.05,
+      "protected": true,
+      "why": "The lead vocal stays where the artist put it, front and centre, and never moves. Close (0.8 m) for intimacy."
+    },
+    {
+      "name": "backing_vocals",
+      "source": "vocals.ambient",
+      "az": 0,
+      "el": 20,
+      "dist": 2.5,
+      "spread": 220,
+      "room_send": 0.45,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Backing vocals sit wide and slightly behind and above, the way stacked harmonies are panned and reverbed in the genre.",
+      "wide": {
+        "spread": 250,
+        "el": 28
+      }
+    },
+    {
+      "name": "kit",
+      "source": "drums.mid",
+      "az": 0,
+      "el": 0,
+      "dist": 1.6,
+      "spread": 50,
+      "room_send": 0.25,
+      "orig_blend": 0.0,
+      "protected": true,
+      "why": "Kick and snare body stay centred and punchy."
+    },
+    {
+      "name": "percussion",
+      "source": "drums.high",
+      "az": 0,
+      "el": 10,
+      "dist": 2.0,
+      "spread": 40,
+      "room_send": 0.3,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Shakers and hats form a ring that turns once every eight bars, slower than 45 degrees per second.",
+      "motion": {
+        "path": "orbit",
+        "period_bars": 8,
+        "depth": 360
+      }
+    },
+    {
+      "name": "bass",
+      "source": "bass.all",
+      "az": 0,
+      "el": 0,
+      "dist": 1.2,
+      "spread": 0,
+      "room_send": 0.05,
+      "orig_blend": 0.0,
+      "protected": true,
+      "why": "Above the crossover the bass stays centred and close; below it the original passes untouched."
+    },
+    {
+      "name": "guitars_keys",
+      "source": "other.direct",
+      "az": 0,
+      "el": 0,
+      "dist": 2.2,
+      "spread": 100,
+      "room_send": 0.3,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Guitars and keys wide in front, keeping their own stereo image inside the pair.",
+      "wide": {
+        "spread": 120,
+        "el": 0
+      }
+    },
+    {
+      "name": "pads",
+      "source": "other.ambient",
+      "az": 0,
+      "el": 0,
+      "dist": 3.0,
+      "spread": 0,
+      "room_send": 0.6,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Pads and ambience feed the surround and height bed."
+    }
+  ],
+  "bed": {
+    "ambience": 0.9,
+    "heights": 0.6
+  },
+  "sections": {
+    "intro": 0.25,
+    "verse": 0.35,
+    "pre-chorus": 0.6,
+    "chorus": 0.9,
+    "drop": 1.0,
+    "bridge": 0.5,
+    "outro": 0.3
+  },
+  "genre": "afrobeats",
+  "_about": "Genre template (decision 0017). Azimuths in degrees, positive to the LEFT (SOFA convention), elevation up, distances in metres. spread is the angle between the object's two virtual sources; wide gives the spread and elevation it opens to in open sections. motion paths: orbit (a full turn per period when depth is 360), sway (back and forth by depth degrees), scaled by the listener's motion depth and capped at 45 degrees per second. protected objects never move."
+}

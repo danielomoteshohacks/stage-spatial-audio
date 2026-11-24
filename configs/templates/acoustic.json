@@ -1,0 +1,112 @@
+{
+  "label": "Acoustic",
+  "space": "living_room",
+  "why": "Acoustic recordings are intimate: a voice and an instrument close in a small room, no movement and a narrow, natural stage.",
+  "audioset": [
+    "Folk music",
+    "Country",
+    "Singer-songwriter",
+    "Acoustic guitar"
+  ],
+  "objects": [
+    {
+      "name": "lead_vocal",
+      "source": "vocals.direct",
+      "az": 0,
+      "el": 0,
+      "dist": 0.9,
+      "spread": 8,
+      "room_send": 0.2,
+      "orig_blend": 0.08,
+      "protected": true,
+      "why": "The lead vocal stays where the artist put it, front and centre, and never moves."
+    },
+    {
+      "name": "harmony",
+      "source": "vocals.ambient",
+      "az": 0,
+      "el": 0,
+      "dist": 1.8,
+      "spread": 90,
+      "room_send": 0.4,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Harmony a little wider, in the same room."
+    },
+    {
+      "name": "percussion",
+      "source": "drums.mid",
+      "az": 0,
+      "el": 0,
+      "dist": 1.8,
+      "spread": 40,
+      "room_send": 0.3,
+      "orig_blend": 0.0,
+      "protected": true,
+      "why": "Light percussion centred."
+    },
+    {
+      "name": "shaker",
+      "source": "drums.high",
+      "az": 0,
+      "el": 0,
+      "dist": 1.8,
+      "spread": 50,
+      "room_send": 0.3,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Shaker static."
+    },
+    {
+      "name": "bass",
+      "source": "bass.all",
+      "az": 0,
+      "el": 0,
+      "dist": 1.4,
+      "spread": 0,
+      "room_send": 0.1,
+      "orig_blend": 0.0,
+      "protected": true,
+      "why": "Above the crossover the bass stays centred and close; below it the original passes untouched."
+    },
+    {
+      "name": "instruments",
+      "source": "other.direct",
+      "az": 0,
+      "el": 0,
+      "dist": 1.6,
+      "spread": 70,
+      "room_send": 0.35,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Guitars and piano close and moderately wide."
+    },
+    {
+      "name": "room",
+      "source": "other.ambient",
+      "az": 0,
+      "el": 0,
+      "dist": 2.5,
+      "spread": 0,
+      "room_send": 0.6,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "The room's own reverberation, opened into the bed."
+    }
+  ],
+  "bed": {
+    "ambience": 0.7,
+    "heights": 0.3
+  },
+  "sections": {
+    "intro": 0.25,
+    "verse": 0.35,
+    "pre-chorus": 0.6,
+    "chorus": 0.6,
+    "drop": 0.7,
+    "bridge": 0.5,
+    "outro": 0.3
+  },
+  "genre": "acoustic",
+  "_about": "Genre template (decision 0017). Azimuths in degrees, positive to the LEFT (SOFA convention), elevation up, distances in metres. spread is the angle between the object's two virtual sources; wide gives the spread and elevation it opens to in open sections. motion paths: orbit (a full turn per period when depth is 360), sway (back and forth by depth degrees), scaled by the listener's motion depth and capped at 45 degrees per second. protected objects never move."
+}

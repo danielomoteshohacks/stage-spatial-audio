@@ -1,0 +1,117 @@
+{
+  "label": "Amapiano",
+  "space": "club",
+  "why": "Amapiano centres on the log drum, a pitched percussive bass, under airy pads and constant shakers. The log drum must stay dry and centred; pads envelop; shakers circle slowly so the groove feels alive without moving the low end.",
+  "audioset": [
+    "House music",
+    "Electronic dance music",
+    "Deep house",
+    "Afrobeat"
+  ],
+  "objects": [
+    {
+      "name": "lead_vocal",
+      "source": "vocals.direct",
+      "az": 0,
+      "el": 0,
+      "dist": 0.9,
+      "spread": 12,
+      "room_send": 0.15,
+      "orig_blend": 0.05,
+      "protected": true,
+      "why": "The lead vocal stays where the artist put it, front and centre, and never moves."
+    },
+    {
+      "name": "backing_vocals",
+      "source": "vocals.ambient",
+      "az": 0,
+      "el": 15,
+      "dist": 2.5,
+      "spread": 200,
+      "room_send": 0.5,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Vocal chops and harmonies wide and a little above."
+    },
+    {
+      "name": "kit",
+      "source": "drums.mid",
+      "az": 0,
+      "el": 0,
+      "dist": 1.6,
+      "spread": 40,
+      "room_send": 0.2,
+      "orig_blend": 0.0,
+      "protected": true,
+      "why": "Log drum transients and kick stay centred and dry."
+    },
+    {
+      "name": "shakers",
+      "source": "drums.high",
+      "az": 0,
+      "el": 15,
+      "dist": 2.2,
+      "spread": 50,
+      "room_send": 0.35,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Shakers circle slowly, once every sixteen bars.",
+      "motion": {
+        "path": "orbit",
+        "period_bars": 16,
+        "depth": 360
+      }
+    },
+    {
+      "name": "bass",
+      "source": "bass.all",
+      "az": 0,
+      "el": 0,
+      "dist": 1.2,
+      "spread": 0,
+      "room_send": 0.03,
+      "orig_blend": 0.0,
+      "protected": true,
+      "why": "Above the crossover the bass stays centred and close; below it the original passes untouched. The log drum lives here."
+    },
+    {
+      "name": "keys",
+      "source": "other.direct",
+      "az": 0,
+      "el": 5,
+      "dist": 2.5,
+      "spread": 110,
+      "room_send": 0.4,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Keys and plucks wide in front."
+    },
+    {
+      "name": "pads",
+      "source": "other.ambient",
+      "az": 0,
+      "el": 0,
+      "dist": 3.5,
+      "spread": 0,
+      "room_send": 0.8,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Pads envelop through the bed."
+    }
+  ],
+  "bed": {
+    "ambience": 1.1,
+    "heights": 0.8
+  },
+  "sections": {
+    "intro": 0.25,
+    "verse": 0.35,
+    "pre-chorus": 0.6,
+    "chorus": 0.9,
+    "drop": 1.0,
+    "bridge": 0.5,
+    "outro": 0.3
+  },
+  "genre": "amapiano",
+  "_about": "Genre template (decision 0017). Azimuths in degrees, positive to the LEFT (SOFA convention), elevation up, distances in metres. spread is the angle between the object's two virtual sources; wide gives the spread and elevation it opens to in open sections. motion paths: orbit (a full turn per period when depth is 360), sway (back and forth by depth degrees), scaled by the listener's motion depth and capped at 45 degrees per second. protected objects never move."
+}

@@ -1,0 +1,113 @@
+{
+  "label": "Classical",
+  "space": "concert_hall",
+  "why": "Orchestral recordings place the listener in a hall facing a wide stage; positions are fixed and the hall's reverberation is part of the music.",
+  "audioset": [
+    "Classical music",
+    "Orchestra",
+    "Opera",
+    "Chamber music",
+    "Classical"
+  ],
+  "objects": [
+    {
+      "name": "soloist",
+      "source": "vocals.direct",
+      "az": 0,
+      "el": 0,
+      "dist": 3.0,
+      "spread": 16,
+      "room_send": 0.6,
+      "orig_blend": 0.05,
+      "protected": true,
+      "why": "A soloist in front, as placed by the recording."
+    },
+    {
+      "name": "chorus",
+      "source": "vocals.ambient",
+      "az": 0,
+      "el": 15,
+      "dist": 7.0,
+      "spread": 140,
+      "room_send": 0.8,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Choir behind the orchestra, raised."
+    },
+    {
+      "name": "percussion",
+      "source": "drums.mid",
+      "az": 0,
+      "el": 5,
+      "dist": 8.0,
+      "spread": 40,
+      "room_send": 0.8,
+      "orig_blend": 0.0,
+      "protected": true,
+      "why": "Timpani and percussion at the back of the stage."
+    },
+    {
+      "name": "cymbals",
+      "source": "drums.high",
+      "az": 0,
+      "el": 5,
+      "dist": 8.0,
+      "spread": 60,
+      "room_send": 0.8,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Cymbals stay where the stage puts them; nothing in an orchestra moves."
+    },
+    {
+      "name": "low_strings",
+      "source": "bass.all",
+      "az": 0,
+      "el": 0,
+      "dist": 6.0,
+      "spread": 30,
+      "room_send": 0.6,
+      "orig_blend": 0.0,
+      "protected": true,
+      "why": "Above the crossover the bass stays centred and close; below it the original passes untouched."
+    },
+    {
+      "name": "orchestra",
+      "source": "other.direct",
+      "az": 0,
+      "el": 0,
+      "dist": 6.0,
+      "spread": 110,
+      "room_send": 0.7,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "The orchestra across a wide stage."
+    },
+    {
+      "name": "hall",
+      "source": "other.ambient",
+      "az": 0,
+      "el": 0,
+      "dist": 10.0,
+      "spread": 0,
+      "room_send": 1.0,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "The hall's reverberation around and above the listener."
+    }
+  ],
+  "bed": {
+    "ambience": 1.2,
+    "heights": 1.0
+  },
+  "sections": {
+    "intro": 0.25,
+    "verse": 0.35,
+    "pre-chorus": 0.6,
+    "chorus": 0.6,
+    "drop": 0.6,
+    "bridge": 0.5,
+    "outro": 0.3
+  },
+  "genre": "classical",
+  "_about": "Genre template (decision 0017). Azimuths in degrees, positive to the LEFT (SOFA convention), elevation up, distances in metres. spread is the angle between the object's two virtual sources; wide gives the spread and elevation it opens to in open sections. motion paths: orbit (a full turn per period when depth is 360), sway (back and forth by depth degrees), scaled by the listener's motion depth and capped at 45 degrees per second. protected objects never move."
+}

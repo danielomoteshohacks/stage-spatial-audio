@@ -1,14 +1,148 @@
 {
-  "track_id": "demo-001",
-  "engine": "0.0.1",
-  "style": { "afrobeats": 0.71, "pop": 0.18, "other": 0.11 },
-  "mode": "studio_room",
-  "intensity": 0.6,
-  "stems": [
-    { "name": "vocals_lead", "az": 0, "el": 0, "dist": 1.2, "spread": 0.1, "room_send": 0.15, "orig_blend": 0.35 },
-    { "name": "perc", "az": 70, "el": 0, "dist": 2.0, "spread": 0.5, "room_send": 0.3, "orig_blend": 0.2 },
-    { "name": "bass", "az": 0, "el": 0, "dist": 1.0, "spread": 0.0, "room_send": 0.0, "orig_blend": 0.6, "mono_below_hz": 120 }
+  "version": 2,
+  "track_id": "example",
+  "engine": "soundstage-v2",
+  "mode": "stems",
+  "intensity": 0.7,
+  "genre": "afrobeats",
+  "genre_source": "default",
+  "style": {},
+  "template": "Afrobeats",
+  "space": "living_room",
+  "motion_depth": 0.7,
+  "crossover_hz": 120.0,
+  "tempo_bpm": 111.988,
+  "first_downbeat_s": 2.15,
+  "sections": [
+    {
+      "start_s": 0.0,
+      "end_s": 8.58,
+      "label": "intro",
+      "openness": 0.25
+    },
+    {
+      "start_s": 8.58,
+      "end_s": 23.58,
+      "label": "verse",
+      "openness": 0.35
+    },
+    {
+      "start_s": 23.58,
+      "end_s": 30.0,
+      "label": "chorus",
+      "openness": 0.9
+    }
   ],
-  "room": { "rt60_s": 0.45, "predelay_ms": 12 },
-  "protected": ["vocals_lead:centre"]
+  "bed": {
+    "ambience": 0.9,
+    "heights": 0.6
+  },
+  "stems": [
+    {
+      "name": "lead_vocal",
+      "source": "vocals.direct",
+      "az": 0,
+      "el": 0,
+      "dist": 0.8,
+      "spread": 10,
+      "room_send": 0.12,
+      "orig_blend": 0.05,
+      "protected": true,
+      "mono_below_hz": 120.0
+    },
+    {
+      "name": "backing_vocals",
+      "source": "vocals.ambient",
+      "az": 0,
+      "el": 20,
+      "dist": 2.5,
+      "spread": 220,
+      "room_send": 0.45,
+      "orig_blend": 0.0,
+      "protected": false,
+      "wide": {
+        "spread": 250,
+        "el": 28
+      },
+      "mono_below_hz": 120.0
+    },
+    {
+      "name": "kit",
+      "source": "drums.mid",
+      "az": 0,
+      "el": 0,
+      "dist": 1.6,
+      "spread": 50,
+      "room_send": 0.25,
+      "orig_blend": 0.0,
+      "protected": true,
+      "mono_below_hz": 120.0
+    },
+    {
+      "name": "percussion",
+      "source": "drums.high",
+      "az": 0,
+      "el": 10,
+      "dist": 2.0,
+      "spread": 40,
+      "room_send": 0.3,
+      "orig_blend": 0.0,
+      "protected": false,
+      "motion": {
+        "path": "sway",
+        "period_bars": 16.0,
+        "depth": 252.0,
+        "max_deg_per_s": 23.09
+      },
+      "mono_below_hz": 120.0
+    },
+    {
+      "name": "bass",
+      "source": "bass.all",
+      "az": 0,
+      "el": 0,
+      "dist": 1.2,
+      "spread": 0,
+      "room_send": 0.05,
+      "orig_blend": 0.0,
+      "protected": true,
+      "mono_below_hz": 120.0
+    },
+    {
+      "name": "guitars_keys",
+      "source": "other.direct",
+      "az": 0,
+      "el": 0,
+      "dist": 2.2,
+      "spread": 100,
+      "room_send": 0.3,
+      "orig_blend": 0.0,
+      "protected": false,
+      "wide": {
+        "spread": 120,
+        "el": 0
+      },
+      "mono_below_hz": 120.0
+    },
+    {
+      "name": "pads",
+      "source": "other.ambient",
+      "az": 0,
+      "el": 0,
+      "dist": 3.0,
+      "spread": 0,
+      "room_send": 0.6,
+      "orig_blend": 0.0,
+      "protected": false,
+      "mono_below_hz": 120.0
+    }
+  ],
+  "protected": [
+    "lead_vocal",
+    "kit",
+    "bass"
+  ],
+  "room": {
+    "predelay_ms": 0.0
+  }
 }

@@ -1,0 +1,114 @@
+{
+  "label": "Rock",
+  "space": "club",
+  "why": "Rock is a band on a stage: the kit spread across the front, rhythm guitars panned hard, vocal and bass centred, a real room behind. Nothing orbits; the energy comes from width and room.",
+  "audioset": [
+    "Rock music",
+    "Heavy metal",
+    "Punk rock",
+    "Grunge",
+    "Alternative rock",
+    "Hard rock"
+  ],
+  "objects": [
+    {
+      "name": "lead_vocal",
+      "source": "vocals.direct",
+      "az": 0,
+      "el": 0,
+      "dist": 1.2,
+      "spread": 10,
+      "room_send": 0.2,
+      "orig_blend": 0.05,
+      "protected": true,
+      "why": "The lead vocal stays where the artist put it, front and centre, and never moves."
+    },
+    {
+      "name": "backing",
+      "source": "vocals.ambient",
+      "az": 0,
+      "el": 5,
+      "dist": 2.5,
+      "spread": 140,
+      "room_send": 0.4,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Backing vocals spread on the stage."
+    },
+    {
+      "name": "kit",
+      "source": "drums.mid",
+      "az": 0,
+      "el": 0,
+      "dist": 2.2,
+      "spread": 80,
+      "room_send": 0.35,
+      "orig_blend": 0.0,
+      "protected": true,
+      "why": "The kit across the front, as a drummer's overheads hear it."
+    },
+    {
+      "name": "cymbals",
+      "source": "drums.high",
+      "az": 0,
+      "el": 15,
+      "dist": 2.2,
+      "spread": 90,
+      "room_send": 0.35,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Cymbals wide and slightly raised, static."
+    },
+    {
+      "name": "bass",
+      "source": "bass.all",
+      "az": 0,
+      "el": 0,
+      "dist": 1.5,
+      "spread": 0,
+      "room_send": 0.05,
+      "orig_blend": 0.0,
+      "protected": true,
+      "why": "Above the crossover the bass stays centred and close; below it the original passes untouched."
+    },
+    {
+      "name": "guitars",
+      "source": "other.direct",
+      "az": 0,
+      "el": 0,
+      "dist": 2.2,
+      "spread": 110,
+      "room_send": 0.3,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "Rhythm guitars wide."
+    },
+    {
+      "name": "room",
+      "source": "other.ambient",
+      "az": 0,
+      "el": 0,
+      "dist": 4.0,
+      "spread": 0,
+      "room_send": 0.7,
+      "orig_blend": 0.0,
+      "protected": false,
+      "why": "The room behind the band."
+    }
+  ],
+  "bed": {
+    "ambience": 0.9,
+    "heights": 0.5
+  },
+  "sections": {
+    "intro": 0.25,
+    "verse": 0.35,
+    "pre-chorus": 0.6,
+    "chorus": 0.9,
+    "drop": 1.0,
+    "bridge": 0.5,
+    "outro": 0.3
+  },
+  "genre": "rock",
+  "_about": "Genre template (decision 0017). Azimuths in degrees, positive to the LEFT (SOFA convention), elevation up, distances in metres. spread is the angle between the object's two virtual sources; wide gives the spread and elevation it opens to in open sections. motion paths: orbit (a full turn per period when depth is 360), sway (back and forth by depth degrees), scaled by the listener's motion depth and capped at 45 degrees per second. protected objects never move."
+}
