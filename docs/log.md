@@ -373,6 +373,13 @@ matched exactly, every v2 render passes the guard; render 8.8 s against 1.8 s.
   clean shifts are exact, but on reverberant scenes deliberately injected 1 to 3 ms shifts are
   only coarsely measured: a known limit of the check.
 
+- Main was red for two pushes: the new Lighthouse step failed on the runner (the preview server
+  answered on IPv6 localhost, Chrome loaded 127.0.0.1), and my fix was pushed while Lighthouse was
+  failing locally, because the local command piped its output through `tail`, which hid the exit
+  code. The real cause of the low score was a layout shift: the "server not reachable" notice
+  pushed the drop zone down (CLS 0.22). The notice now sits below the drop zone; performance is
+  0.97 again. Exit codes are now checked directly before every push.
+
 ### Next
 
 The owner runs the Kaggle notebook (the separator), the blind test with listeners, and a check on
