@@ -1,0 +1,74 @@
+/* SoundStage brand tokens. See web/BRAND.md for the reasoning and the contrast checks.
+   Colours come from a Lagos lagoon at sunset: deep night ink, the lagoon's luminous teal, the
+   coral of the last light, and the ivory of the shore. */
+:root {
+  /* Ink: the night. Surfaces are layers of frosted glass above it. */
+  --ink: #08090d;
+  --ink-2: #0e1016;
+  --ink-3: #151821;
+  --glass: rgb(22 25 34 / 0.62);
+  --glass-strong: rgb(28 31 42 / 0.82);
+  --hairline: rgb(244 241 234 / 0.1);
+  --hairline-top: rgb(244 241 234 / 0.18);
+
+  /* Ivory text, at three strengths (all at least 4.5:1 on --ink and on --glass over ink). */
+  --ivory: #f4f1ea;
+  --ivory-2: rgb(244 241 234 / 0.72);
+  --ivory-3: rgb(244 241 234 / 0.56);
+
+  /* Signature colours, tuned for AA on ink: lagoon 9.5:1, coral 7.8:1; ink on lagoon 9.5:1. */
+  --lagoon: #1fc8b4;
+  --lagoon-deep: #0f7f73;
+  --lagoon-glow: rgb(31 200 180 / 0.28);
+  --coral: #ff7a5c;
+  --coral-glow: rgb(255 122 92 / 0.26);
+
+  /* Status, used sparingly: the guard's verdict. */
+  --pass: #1fc8b4;
+  --review: #f2c14e;
+  --fail: #ff7a5c;
+
+  /* Dynamic accent: the now-playing screen replaces these with colours from the artwork. */
+  --accent: var(--lagoon);
+  --accent-2: var(--coral);
+  --accent-ink: #061412;
+
+  /* Type. Instrument Sans for the interface, Instrument Serif for editorial headings. */
+  --font-ui: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-hero: clamp(2.6rem, 10vw, 4.75rem);
+
+  /* Space, radius, shadow and motion. */
+  --gap-1: 4px;
+  --gap-2: 8px;
+  --gap-3: 12px;
+  --gap-4: 16px;
+  --gap-5: 24px;
+  --gap-6: 32px;
+  --gap-7: 48px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.28);
+  --shadow-2: 0 2px 4px rgb(0 0 0 / 0.35), 0 12px 32px rgb(0 0 0 / 0.38), 0 32px 64px rgb(0 0 0 / 0.3);
+  --blur: 22px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 120ms;
+  --dur-2: 240ms;
+  --dur-3: 420ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-1: 0ms;
+    --dur-2: 0ms;
+    --dur-3: 0ms;
+  }
+}
