@@ -32,6 +32,10 @@ class Separation:
     model: str = "unknown"
     device: str = "cpu"
     notes: list[str] = field(default_factory=list)
+    #: The fallback chain's attempts (stage.separation.chain), and engine-specific measurements
+    #: such as the separator's per-stem leakage estimates.
+    chain: list[dict] = field(default_factory=list)
+    details: dict = field(default_factory=dict)
 
 
 def fit_length(x: NDArray[np.float64], n: int) -> NDArray[np.float64]:

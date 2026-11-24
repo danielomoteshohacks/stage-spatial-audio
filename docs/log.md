@@ -234,3 +234,35 @@ Phase 1: measured HRTFs (SADIE II KU100), interpolation, binaural rooms, neutral
 ### Next
 
 Phase 2A: the SoundStage Separator (research note first).
+
+## 2026-11-24: v2 Phase 2A, the SoundStage Separator
+
+### Done
+
+- Research note `docs/research/separation.md` before any code. The papers' own pages were
+  blocked here; the Demucs and norbert READMEs were read, and paper tables were taken from
+  search summaries and marked secondary.
+- `stage.separation.ssep`: network (3.95 M parameters, 8.4 MB fp16 ONNX), spatial/HPSS/f0 front
+  end, Wiener plus bleed plus consistency back end, ONNX Runtime inference.
+- `training/`: data and augmentation, losses, training with AMP and resume, ONNX export with a
+  model card, teacher pseudo-labels, the Kaggle notebook and its README.
+- `scripts/eval_separation.py`: museval BSSEval v4 per stem for ssep, htdemucs, htdemucs_ft, with
+  size and CPU time; writes the gate into model.json.
+- `stage.separation.chain`: ssep (CPU, only when it beats htdemucs), teacher (GPU), Lite; the
+  Space calls only the teacher inside @spaces.GPU. CI gains a `separator` job with CPU torch.
+
+### Measured
+
+- Overfit gate passes (mean SDR at least 8 dB in 100 steps); ONNX parity under 1e-4; stems sum to
+  the mixture within 1e-6; 9.8 s of CPU per 30 s of audio for the full-size graph.
+- Tests: 440 passed, 1 skipped locally with torch installed.
+
+### What went wrong
+
+- The bass converged inverted from random complex masks; fixed by initialising the mask heads at
+  an equal in-phase split (decision 0015).
+- The first network was 11.2 MB in fp16; the mask heads' hidden width was halved to fit 10 MB.
+
+### Next
+
+The owner runs the Kaggle notebook (four runs, about 25 GPU hours). Phase 2B: the spatial scene.

@@ -7,3 +7,6 @@ scipy
 soundfile
 torch
 demucs
+# The SoundStage Separator runs on the CPU through ONNX Runtime (MIT), outside ZeroGPU.
+onnxruntime
+huggingface_hub

@@ -18,7 +18,6 @@ import traceback
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +33,8 @@ from stage.guard.levels import peak_gain, rms
 from stage.guard.report import build_report
 from stage.io import read_audio, to_stereo
 from stage.render.sectors import WIDEN_BETA_MAX, WIDEN_BETA_MIN
-from stage.separation.demucs_sep import STEM_NAMES, Separation, separate
+from stage.separation.chain import separate_chain
+from stage.separation.demucs_sep import STEM_NAMES, Separation
 
 MODES = ("lite", "stems")
 STAGES = ("load", "separate", "render", "levels", "guard", "write")
@@ -188,7 +188,7 @@ def run(
                 # An unreadable file is reported by the load stage with its own error.
                 start = 0.0
     start = float(start or 0.0)
-    sep_fn: Separator = separator or partial(separate, model="htdemucs", device="auto")
+    sep_fn: Separator = separator or separate_chain
     st = _Stages(STAGES, on_stage)
     effective_mode = mode
     fallback: dict[str, str] | None = None
@@ -245,6 +245,8 @@ def run(
                 "residual_snr_db": _finite(sep.residual_snr_db),
                 "residual_is_zero": sep.residual_snr_db == float("inf"),
                 "notes": list(sep.notes),
+                "chain": list(sep.chain),
+                "details": dict(sep.details),
             }
 
     # render

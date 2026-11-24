@@ -199,6 +199,39 @@
               "items": {
                 "type": "string"
               }
+            },
+            "chain": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "status",
+                  "reason"
+                ],
+                "properties": {
+                  "name": {
+                    "enum": [
+                      "ssep",
+                      "teacher"
+                    ]
+                  },
+                  "status": {
+                    "enum": [
+                      "ok",
+                      "skipped",
+                      "failed"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "details": {
+              "type": "object"
             }
           },
           "additionalProperties": false

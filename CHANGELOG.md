@@ -18,6 +18,10 @@ All notable changes are recorded here. The format follows
   (`tools/hrtf-pack`), spherical interpolation, six binaural spaces (`configs/spaces`), zero-phase
   bass bypass, timbre and loudness matching. `space:<name>` profiles; `space:studio` is the
   default. Decisions 0012 to 0014.
+- SoundStage Separator (decision 0015): our band-split, dual-domain network with a spatial
+  front end and a Wiener and consistency back end (`stage.separation.ssep`), ONNX inference on
+  the CPU, Kaggle training (`training/`), `scripts/eval_separation.py`, and the fallback chain
+  ssep, teacher, Lite recorded in run.json.
 - `stage.pipeline.run` with a per-stage run report (`schemas/run.schema.json`), Lite fallback and
   24-bit FLAC outputs; `scripts/process_track.py`.
 - `stage.separation.demucs_sep` (optional `separation` extra: torch, demucs).

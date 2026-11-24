@@ -27,7 +27,7 @@ def test_cli_reports_a_fallback(track, tmp_path, capsys, monkeypatch):
     def unavailable(*a, **k):
         raise SeparationUnavailable("torch and demucs are not installed")
 
-    monkeypatch.setattr("stage.pipeline.separate", unavailable)
+    monkeypatch.setattr("stage.pipeline.separate_chain", unavailable)
     code = process_track.main([str(track), "--mode", "stems", "--profile", "V0",
                                "--out-dir", str(tmp_path / "r")])
     assert code == 0

@@ -17,7 +17,9 @@ dev = ["pytest", "ruff", "jsonschema", "pyloudnorm"]
 viz = ["matplotlib"]
 # Stem separation (Demucs). Heavy: torch alone is several hundred MB, so it stays optional and
 # the Lite path never imports it.
-separation = ["torch", "demucs"]
+separation = ["torch", "demucs", "onnxruntime"]
+# Training and exporting the SoundStage Separator (see training/README.md).
+training = ["torch", "onnx", "onnxscript", "onnxruntime", "huggingface_hub", "museval"]
 # The Gradio backend in space/ (the Space installs its own pinned list from space/requirements.txt).
 backend = ["gradio"]
 
@@ -36,3 +38,7 @@ select = ["E", "F", "I", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff.lint.per-file-ignores]
+# Notebook cells hold long command lists for Kaggle that read better on one line each.
+"*.ipynb" = ["E501"]

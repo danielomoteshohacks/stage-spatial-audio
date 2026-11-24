@@ -32,6 +32,7 @@ from stage import __version__  # noqa: E402
 from stage.engines import DEFAULT_PROFILE, profile_names  # noqa: E402
 from stage.pipeline import MODES, STAGES  # noqa: E402
 from stage.render.sectors import WIDEN_BETA_MAX, WIDEN_BETA_MIN  # noqa: E402
+from stage.separation.chain import separate_chain  # noqa: E402
 from stage.separation.demucs_sep import Separation, separate  # noqa: E402
 from stage.service import (  # noqa: E402
     ALLOWED_EXTENSIONS,
@@ -60,6 +61,11 @@ def _separate(audio, sample_rate: int) -> Separation:
 
 
 gpu_separate = spaces.GPU(duration=GPU_DURATION_S)(_separate) if spaces is not None else _separate
+
+
+def chain_separate(audio, sample_rate: int) -> Separation:
+    """Our separator on the CPU first; only the teacher fallback asks ZeroGPU for a GPU."""
+    return separate_chain(audio, sample_rate, teacher=gpu_separate)
 
 
 def _read_json(path) -> Any:
@@ -91,7 +97,7 @@ def process(audio_file, mode, profile, beta, start, seconds):
         start=start, seconds=seconds,
     )
     yield _progress(stages, done=False, error=None), None, None, None, None
-    for event in stream_process_upload(path, options, separator=gpu_separate):
+    for event in stream_process_upload(path, options, separator=chain_separate):
         if event["type"] == "stage":
             stages[event["stage"]] = {k: event[k] for k in ("stage", "status", "duration_s",
                                                              "error")}
@@ -161,6 +167,7 @@ def fetch_assets() -> None:
     Until it arrives (or if the download fails) renders use the analytic head model, and run.json
     names the head that was used, so a render is never mislabelled.
     """
+    from stage.separation.ssep.infer import fetch_weights
     from stage.spatial.hrtf import download_pack
 
     def work() -> None:
@@ -168,6 +175,9 @@ def fetch_assets() -> None:
             print(f"HRTF pack ready: {download_pack()}", flush=True)
         except Exception as exc:  # the analytic fallback keeps the Space working
             print(f"HRTF pack unavailable, using the analytic head: {exc}", flush=True)
+        weights = fetch_weights()
+        print(f"SoundStage Separator weights: {weights or 'not published yet; the teacher runs'}",
+              flush=True)
 
     threading.Thread(target=work, name="soundstage-assets", daemon=True).start()
 
