@@ -107,7 +107,9 @@ def test_builder_reads_a_sofa_file(tmp_path):
     manifest = json.loads((out / "manifest.json").read_text())
     assert manifest["licence"] == "Apache-2.0" and "University of York" in manifest["attribution"]
     pack = read_pack(out / manifest["pack"]["file"])
-    assert pack.n_directions == az.size
+    # Resampled onto the uniform grid, with the measured count and the smoothing on record.
+    assert pack.n_directions == 4000 and manifest["pack"]["measured_directions"] == az.size
+    assert manifest["pack"]["continuity"]["azimuth"]["db_per_degree"] <= 0.5
     assert pack.az_deg.min() >= -180 and pack.az_deg.max() < 180
 
 

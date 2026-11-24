@@ -33,7 +33,8 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
-from stage.spatial.hrtfpack import process_hrirs, write_pack  # noqa: E402
+from stage.spatial.hrtf import choose_smoothing  # noqa: E402
+from stage.spatial.hrtfpack import process_hrirs, sha256, write_pack  # noqa: E402
 from stage.spatial.roommetrics import brir_metrics  # noqa: E402
 
 #: SADIE II Database on Zenodo (Armstrong, Thresh, Murphy and Kearney, University of York).
@@ -45,6 +46,7 @@ ATTRIBUTION = (
     "Apache License 2.0."
 )
 PACK_NAME = "sadie2-d1-ku100.npz"
+BRIR_NAME = "sadie2-d1-brir48k.npz"
 
 
 def fetch(url: str) -> bytes:
@@ -178,7 +180,10 @@ def main() -> None:
                  if "d1" in k.lower() or chosen["key"].lower().find("d1") >= 0}
 
     names = sorted(files)
-    manifest["archive_files"] = names
+    # The archive holds tens of thousands of per-direction WAVs; the manifest keeps the SOFA
+    # files and a count, so it stays readable.
+    manifest["archive_files"] = {"sofa": [n for n in names if n.lower().endswith(".sofa")],
+                                 "total": len(names)}
     notice = [n for n in names if Path(n).name.lower() in ("license", "license.txt", "notice",
                                                             "notice.txt", "readme.txt")]
     manifest["notice_text"] = {n: files[n].decode(errors="replace")[:20000] for n in notice}
@@ -197,15 +202,40 @@ def main() -> None:
                                      "DataType", "Comment", "History")},
         "attribution": ATTRIBUTION,
     })
+    # The measured grid is rings with 1 degree azimuth steps (thousands of points closer than
+    # half a degree, whose far-ear responses disagree by several dB): resample it onto a uniform
+    # grid with the least smoothing that keeps azimuth movement continuous (decision 0012).
+    pack, continuity = choose_smoothing(pack, int(sofa["fs"]))
+    print("smoothing", pack.meta["spatial_smoothing_deg"], "continuity", continuity)
     digest = write_pack(pack, out / PACK_NAME)
     manifest["pack"] = {"file": PACK_NAME, "sha256": digest,
                         "bytes": (out / PACK_NAME).stat().st_size,
                         "directions": pack.n_directions, "bins": int(pack.freqs_hz.size),
-                        "sample_rate": sofa["fs"], "sofa_file": hrir_name}
+                        "sample_rate": sofa["fs"], "sofa_file": hrir_name,
+                        "measured_directions": int(ir.shape[0]),
+                        "smoothing_deg": pack.meta["spatial_smoothing_deg"],
+                        "continuity": continuity}
     print(f"pack {PACK_NAME}: {manifest['pack']['bytes'] / 2**20:.2f} MB, sha256 {digest}")
 
     brirs = [n for n in names if n.lower().endswith(".sofa") and "brir" in n.lower()]
     reference = []
+    brir48 = [n for n in brirs if "48k" in n.lower()]
+    if brir48:
+        # The measured studio BRIRs, kept whole (about 50 directions of 0.3 s) as float16: the
+        # reference the synthetic rooms are calibrated against (stage.spatial.room).
+        b = read_sofa(files[brir48[0]])
+        bir = b["ir"][:, :, 0, :] if b["ir"].ndim == 4 else b["ir"]
+        peak = float(np.max(np.abs(bir)))
+        with open(out / BRIR_NAME, "wb") as fh:
+            np.savez_compressed(fh, az_deg=b["az"].astype(np.float32),
+                                el_deg=b["el"].astype(np.float32),
+                                ir=(bir / peak).astype(np.float16), scale=np.float64(peak),
+                                sample_rate=np.float64(b["fs"]),
+                                meta_json=np.array(json.dumps({"sofa_file": brir48[0],
+                                                               "attribution": ATTRIBUTION})))
+        manifest["brir_pack"] = {"file": BRIR_NAME, "sha256": sha256(out / BRIR_NAME),
+                                 "bytes": (out / BRIR_NAME).stat().st_size,
+                                 "directions": int(bir.shape[0]), "samples": int(bir.shape[-1])}
     for name in brirs:
         b = read_sofa(files[name])
         bir = b["ir"][:, :, 0, :] if b["ir"].ndim == 4 else b["ir"]

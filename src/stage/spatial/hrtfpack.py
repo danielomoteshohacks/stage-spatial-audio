@@ -208,3 +208,73 @@ def sha256(path: str | Path) -> str:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def spatially_smooth(pack: HrtfPack, sigma_ipsi_deg: float, sigma_contra_deg: float,
+                     target: tuple[NDArray, NDArray] | None = None,
+                     sigma_itd_deg: float = 2.0, high_scale: float = 1.0,
+                     high_from_hz: float = 8000.0) -> HrtfPack:
+    """Gaussian kernel regression of the log magnitudes over the sphere, wider for the far ear.
+
+    Each output direction's magnitude is the area-weighted Gaussian average of the measured
+    neighbours'. The width grows from `sigma_ipsi_deg` for the ear facing the source to
+    `sigma_contra_deg` for the ear in the head's shadow, where the measured response changes
+    fastest with direction and is closest to the noise floor, but carries the least localisation
+    weight: the near ear's spectrum dominates elevation and front/back judgements (Hofman and Van
+    Opstal 2003, "Binaural weighting of pinna cues in human sound localization", Exp. Brain Res.
+    149). The ITD is regressed with its own narrow width.
+
+    With `target` (azimuths, elevations) the result is resampled onto those directions: a
+    uniform grid gives a triangulation without the slivers of a ring-measured grid.
+
+    `high_scale` widens the kernel above `high_from_hz`, rising linearly in log frequency to
+    that factor at twice the frequency. Above about 8 kHz the pinna's notches move fastest with
+    direction and differ most between people, so a dummy head's fine structure there is the part
+    least likely to match a listener (Middlebrooks 1999, "Individual differences in external-ear
+    transfer functions reduced by scaling in frequency", JASA 106(3)).
+    """
+    from scipy import sparse
+    from scipy.spatial import cKDTree
+
+    src = unit_vectors(pack.az_deg, pack.el_deg)
+    w_src = area_weights(pack.az_deg, pack.el_deg)
+    t_az, t_el = (pack.az_deg, pack.el_deg) if target is None else target
+    dst = unit_vectors(np.asarray(t_az, float), np.asarray(t_el, float))
+    smax = max(sigma_ipsi_deg * high_scale, sigma_contra_deg * high_scale, sigma_itd_deg, 0.5)
+    radius = 2.0 * np.sin(np.radians(2.5 * smax) / 2.0)
+    neigh = cKDTree(src).query_ball_point(dst, radius)
+    rows = np.repeat(np.arange(dst.shape[0]), [len(n) for n in neigh])
+    cols = np.concatenate([np.asarray(n, dtype=np.int64) for n in neigh])
+    ang = np.degrees(np.arccos(np.clip(np.sum(dst[rows] * src[cols], axis=1), -1.0, 1.0)))
+    shape = (dst.shape[0], src.shape[0])
+
+    def regress(sigma_rows: NDArray, values: NDArray) -> NDArray:
+        k = np.exp(-0.5 * (ang / np.maximum(sigma_rows[rows], 0.25)) ** 2) * w_src[cols]
+        mat = sparse.csr_matrix((k, (rows, cols)), shape=shape)
+        mat = sparse.diags(1.0 / np.asarray(mat.sum(axis=1)).ravel()) @ mat
+        return mat @ values
+
+    out = np.empty((dst.shape[0],) + pack.logmag_db.shape[1:])
+    f = pack.freqs_hz
+    ramp = np.clip(np.log2(np.maximum(f, 1.0) / high_from_hz), 0.0, 1.0)[np.newaxis, :]
+    for ear, toward in ((0, 1.0), (1, -1.0)):  # y points left: the left ear faces +y
+        lateral = toward * dst[:, 1]
+        sigma = sigma_ipsi_deg + (sigma_contra_deg - sigma_ipsi_deg) * np.clip(-lateral, 0, 1)
+        low = regress(sigma, pack.logmag_db[:, ear])
+        if high_scale > 1.0:
+            high = regress(sigma * high_scale, pack.logmag_db[:, ear])
+            low = (1.0 - ramp) * low + ramp * high
+        out[:, ear] = low
+    itd = regress(np.full(dst.shape[0], sigma_itd_deg), pack.itd_s)
+    meta = dict(pack.meta)
+    meta["spatial_smoothing_deg"] = {"ipsilateral": sigma_ipsi_deg,
+                                     "contralateral": sigma_contra_deg, "itd": sigma_itd_deg,
+                                     "high_scale": high_scale, "high_from_hz": high_from_hz}
+    meta["n_directions"] = int(dst.shape[0])
+    if target is None:
+        diff = np.abs(out - pack.logmag_db)
+        meta["smoothing_change_db"] = {"mean_abs": round(float(diff.mean()), 3),
+                                       "p99_abs": round(float(np.percentile(diff, 99)), 3)}
+    return HrtfPack(az_deg=np.asarray(t_az, float), el_deg=np.asarray(t_el, float),
+                    logmag_db=out, itd_s=itd, freqs_hz=pack.freqs_hz, df_mag_db=pack.df_mag_db,
+                    df_coherence=pack.df_coherence, meta=meta)
