@@ -5,6 +5,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 const MIN = 0.9;
+const RUNS = 3;
 // Bound to 127.0.0.1 explicitly: on CI runners "localhost" resolves to IPv6 first, and Chrome
 // then shows an error interstitial for http://127.0.0.1.
 const preview = spawn("npx", ["vite", "preview", "--host", "127.0.0.1", "--port", "4317", "--strictPort"], { stdio: "ignore" });
@@ -22,14 +23,22 @@ try {
     console.error("the preview server did not answer on http://127.0.0.1:4317/");
     process.exit(1);
   }
-  const out = "lighthouse-report.json";
-  const run = spawnSync("npx", ["-y", "lighthouse@12.8.2", "http://127.0.0.1:4317/", "--quiet",
-    "--chrome-flags=--headless=new --no-sandbox", "--only-categories=performance,accessibility,best-practices",
-    "--output=json", `--output-path=${out}`], { stdio: "inherit" });
-  if (run.status !== 0) process.exit(run.status ?? 1);
-  const report = JSON.parse(readFileSync(out, "utf8"));
-  const scores = Object.fromEntries(Object.entries(report.categories).map(([k, v]) => [k, v.score]));
-  console.log("Lighthouse (mobile):", scores);
+  // Three runs and the median per category, as Lighthouse CI does by default: one run on a
+  // shared CI machine varies by 0.1 or more (0.97 and 0.85 on the same build).
+  const runs = [];
+  for (let i = 0; i < RUNS; i++) {
+    const out = `lighthouse-report-${i}.json`;
+    const run = spawnSync("npx", ["-y", "lighthouse@12.8.2", "http://127.0.0.1:4317/", "--quiet",
+      "--chrome-flags=--headless=new --no-sandbox", "--only-categories=performance,accessibility,best-practices",
+      "--output=json", `--output-path=${out}`], { stdio: "inherit" });
+    if (run.status !== 0) process.exit(run.status ?? 1);
+    const report = JSON.parse(readFileSync(out, "utf8"));
+    runs.push(Object.fromEntries(Object.entries(report.categories).map(([k, v]) => [k, v.score])));
+  }
+  const median = (xs) => [...xs].sort((p, q) => p - q)[Math.floor(xs.length / 2)];
+  const scores = Object.fromEntries(Object.keys(runs[0]).map((k) => [k, median(runs.map((r) => r[k]))]));
+  console.log("Lighthouse (mobile), runs:", runs);
+  console.log("Lighthouse (mobile), median:", scores);
   const failing = ["performance", "accessibility"].filter((k) => scores[k] < MIN);
   if (failing.length) {
     console.error(`below ${MIN}: ${failing.join(", ")}`);
