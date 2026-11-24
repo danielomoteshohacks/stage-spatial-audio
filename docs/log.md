@@ -321,3 +321,28 @@ causality-aware peak choice (0019).
 ### Next
 
 Phase 5: the product.
+
+## 2026-11-24: v2 Phase 5, the product
+
+### Done
+
+The web app rebuilt on the new brand (decision 0020): Home with the on-device library, Now Playing
+with artwork colours, the A/B switch, scene controls through /rerender, parts, the stage view,
+Feel, the blind test, Media Session, PWA and keyboard control. `character` (intimate, balanced,
+immersive) added to the plan and the API.
+
+### Measured
+
+First load 127 KB gzipped with fonts; Lighthouse mobile 0.97 / 1.00 / 1.00; 26 web tests; end to
+end in Chromium at phone size against a local backend.
+
+### What went wrong
+
+- The player sheet showed two title bars; the sheet now has a bare mode.
+- The stage view drew the ambient bed as a dot in front of the listener although it surrounds
+  them; bed objects are now rings.
+- The serif italic was bundled but unused (21 KB); removed.
+
+### Next
+
+Head tracking stays a design (0020). Phase 6: the benchmark.
