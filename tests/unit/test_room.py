@@ -94,7 +94,9 @@ def test_the_low_band_split_is_exact_and_the_bass_passes_untouched():
     x = np.random.default_rng(0).standard_normal((2, FS))
     low, high = split_low_high(x, FS)
     assert np.max(np.abs(low + high - x)) < 1e-12
-    y, info = render(x * 0.1, FS, DEFAULT_PROFILE)
+    # The Phase 1 virtual-loudspeaker renderer in the studio (the scene renderer's own bass
+    # handling is checked in tests/unit/test_scene.py).
+    y, info = render(x * 0.1, FS, "space:studio")
     assert info["engine"] == "v2" and info["space"] == "studio"
     low_y, _ = split_low_high(y, FS)
     low_x, _ = split_low_high(x * 0.1, FS)

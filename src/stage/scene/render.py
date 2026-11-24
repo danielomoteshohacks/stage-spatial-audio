@@ -60,6 +60,12 @@ BED_LAYOUT: dict[str, tuple[float, float] | None] = {
 BED_FEEDS = {0: (("Ls", "side"), ("Lrs", "rear"), ("Ltf", "height"), ("Ltr", "height")),
              1: (("Rs", "side"), ("Rrs", "rear"), ("Rtf", "height"), ("Rtr", "height"))}
 DISTANCE_REF_M = 1.5
+#: Template distances are written for a room at home (loudspeakers about 2 m away). In another
+#: space the room model places each object at the same distance relative to that space's own
+#: listening distance, so a concert hall is heard from a seat in the hall rather than from 2 m in
+#: front of the orchestra (where its reverberation would barely register). Level and near-field
+#: cues keep the template distance, so the mix balance does not change with the space.
+HOME_LISTENING_M = 2.0
 BLOCK = 1024
 HOP = BLOCK // 2
 #: Share of an ambient bed object's energy kept on the front pair, so the record's own space is
@@ -270,7 +276,7 @@ def render_scene(audio: NDArray, sample_rate: int, plan: dict[str, Any],
     sr = int(sample_rate)
     n = audio.shape[1]
     space = plan.get("space", "studio")
-    get_space(space)  # fail early on an unknown space
+    room_scale = get_space(space).speaker_distance_m / HOME_LISTENING_M
     hs = get_hrtf(sr)
     crossover = float(plan.get("crossover_hz", 120.0))
     low, high_mix = split_low_high(audio, sr, crossover)
@@ -301,9 +307,9 @@ def render_scene(audio: NDArray, sample_rate: int, plan: dict[str, Any],
             x = parts[part]
             blend = float(obj.get("orig_blend", 0.0))
             y = np.zeros((2, n))
-            g = distance_gain(float(obj["dist"]))
+            g = distance_gain(float(obj["dist"]))  # the template distance: balance stays
             send = float(obj.get("room_send", 0.5))
-            dist = float(obj["dist"])
+            dist = round(float(obj["dist"]) * room_scale, 2)
             is_bed = part == "ambient" and float(obj.get("spread", 0.0)) == 0.0
             if is_bed:
                 gate = transient_gate(x, sr)

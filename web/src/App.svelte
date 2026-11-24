@@ -44,11 +44,11 @@
 
   let file: File | null = $state(null);
   let quick = $state(false);
-  let space: SpaceName = $state("studio");
+  let space: SpaceName = $state("living_room");
   let character: Character = $state("balanced");
   let motion = $state(0.5);
   let genre = $state("auto");
-  let applied = $state({ space: "studio", character: "balanced", motion: 0.5, genre: "auto" });
+  let applied = $state({ space: "living_room", character: "balanced", motion: 0.5, genre: "auto" });
 
   let phase: "idle" | "uploading" | "processing" | "downloading" = $state("idle");
   let upload = $state(0);

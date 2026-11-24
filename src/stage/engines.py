@@ -18,7 +18,10 @@ from numpy.typing import NDArray
 from stage.render.profiles import PROFILES, render_profile
 
 SPACE_PREFIX = "space:"
-DEFAULT_PROFILE = "space:studio"
+#: The living room is the default: in the spatial benchmark (docs/log.md, Phase 6) it is the
+#: space where the stems scene is most enveloping while every render still passes the guard; the
+#: studio stays available as the dry, faithful choice.
+DEFAULT_PROFILE = "space:living_room"
 
 
 def space_profiles() -> list[str]:
@@ -29,7 +32,8 @@ def space_profiles() -> list[str]:
 
 def profile_names() -> list[str]:
     """v2 spaces first (the default first of all), then the v1 profiles for comparison."""
-    return space_profiles() + list(PROFILES)
+    spaces = space_profiles()
+    return [DEFAULT_PROFILE] + [p for p in spaces if p != DEFAULT_PROFILE] + list(PROFILES)
 
 
 def is_v2(profile: str) -> bool:
