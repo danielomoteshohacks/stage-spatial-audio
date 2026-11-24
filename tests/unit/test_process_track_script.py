@@ -16,7 +16,7 @@ def test_cli_runs_lite_and_prints_every_stage(track, tmp_path, capsys):
                                "--out-dir", str(out)])
     text = capsys.readouterr().out
     assert code == 0
-    for name in ("load", "separate", "render", "levels", "write"):
+    for name in ("load", "separate", "render", "levels", "guard", "write"):
         assert name in text
     assert json.loads((out / "run.json").read_text())["ok"] is True
 

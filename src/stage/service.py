@@ -7,6 +7,7 @@ folders older than the time-to-live are deleted on every call and by `start_swee
 
 from __future__ import annotations
 
+import math
 import queue
 import shutil
 import subprocess
@@ -31,7 +32,6 @@ MAX_TRACK_S = 12 * 60.0
 #: An upload larger than this is refused before decoding; 12 minutes of 24-bit 96 kHz stereo WAV
 #: is about 415 MB, so this admits every allowed track in a compressed or 16/24-bit 48 kHz form.
 MAX_UPLOAD_BYTES = 450 * 1024 * 1024
-DEFAULT_START_S = 30.0
 DEFAULT_SECONDS = 30.0
 #: The render keeps whole-signal arrays (about 3 GB for 4 minutes), and a free GPU quota is a few
 #: minutes a day, so one request renders at most this much.
@@ -50,8 +50,8 @@ class ServiceOptions:
     mode: str = "lite"
     profile: str = "max"
     beta: float = 2.0
-    start: float | None = None  # None: DEFAULT_START_S, moved earlier if the track is short
-    seconds: float | None = None  # None: DEFAULT_SECONDS
+    start: float | str | None = "auto"  # "auto" or None: the loudest window; else seconds
+    seconds: float | str | None = None  # None or "": DEFAULT_SECONDS
 
 
 @dataclass
@@ -64,6 +64,7 @@ class ServiceResult:
     stems: dict[str, Path]
     run_json: Path | None
     run: dict[str, Any]
+    report_json: Path | None
     expires_at: float
     notes: list[str] = field(default_factory=list)
 
@@ -159,31 +160,64 @@ def validate_upload(path: str | Path, work_dir: Path) -> tuple[Path, float, list
     return readable, duration, notes
 
 
-def resolve_excerpt(duration: float, start: float | None,
-                    seconds: float | None) -> tuple[float, float, list[str]]:
-    """Choose the excerpt. The default (30 s from 30 s in) moves earlier for short tracks."""
-    notes: list[str] = []
-    length = DEFAULT_SECONDS if seconds is None else float(seconds)
-    if not MIN_EXCERPT_S <= length <= MAX_EXCERPT_S:
+def parse_start(value: Any) -> float | str:
+    """Read the start field: empty or "auto" means the loudest window; otherwise seconds >= 0.
+
+    The web app and the Gradio form both send text, and older clients send numbers, so both are
+    accepted. Anything else is refused with a message for the person filling the form.
+    """
+    if value is None or (isinstance(value, str) and value.strip().lower() in ("", "auto")):
+        return "auto"
+    try:
+        start = float(value)
+    except (TypeError, ValueError):
+        raise ValidationError(f"The start time {value!r} is not a number of seconds. Leave it "
+                              "empty to start at the loudest part.") from None
+    if not math.isfinite(start) or start < 0:
+        raise ValidationError("The start time must be zero or more seconds.")
+    return start
+
+
+def parse_seconds(value: Any) -> float:
+    """Read the length field: empty means DEFAULT_SECONDS; otherwise MIN..MAX_EXCERPT_S.
+
+    A 0-second length is never accepted: it has nothing to render, and a form that shows 0 for an
+    empty field must not be able to send it as if it were a choice.
+    """
+    if value is None or (isinstance(value, str) and value.strip() == ""):
+        return DEFAULT_SECONDS
+    try:
+        length = float(value)
+    except (TypeError, ValueError):
+        raise ValidationError(f"The length {value!r} is not a number of seconds.") from None
+    if not math.isfinite(length) or not MIN_EXCERPT_S <= length <= MAX_EXCERPT_S:
         raise ValidationError(f"The excerpt length must be between {MIN_EXCERPT_S:.0f} and "
-                              f"{MAX_EXCERPT_S:.0f} seconds.")
+                              f"{MAX_EXCERPT_S:.0f} seconds; leave it empty for "
+                              f"{DEFAULT_SECONDS:.0f}.")
+    return length
+
+
+def resolve_excerpt(duration: float, start: Any,
+                    seconds: Any) -> tuple[float | str, float, list[str]]:
+    """Choose the excerpt: (start, length, notes). The start may stay "auto".
+
+    "auto" (the default) is resolved by the pipeline to the loudest window of the requested
+    length (stage.analysis.excerpt), so the run report records the chosen start and its loudness.
+    """
+    notes: list[str] = []
+    length = parse_seconds(seconds)
+    begin = parse_start(start)
     if length > duration:
         notes.append(f"the track is only {duration:.1f} s long, so all of it is used")
         length = duration
-    if start is None:
-        begin = min(DEFAULT_START_S, max(0.0, duration - length))
-        if begin < DEFAULT_START_S:
-            notes.append(f"the excerpt starts at {begin:.1f} s so it fits in the track")
-    else:
-        begin = float(start)
-        if begin < 0:
-            raise ValidationError("The start time cannot be negative.")
-        if begin >= duration:
-            raise ValidationError(f"The start time ({begin:.1f} s) is past the end of the track "
-                                  f"({duration:.1f} s).")
-        if begin + length > duration:
-            length = duration - begin
-            notes.append(f"the excerpt is shortened to {length:.1f} s at the end of the track")
+    if begin == "auto":
+        return "auto", length, notes
+    if begin >= duration:
+        raise ValidationError(f"The start time ({begin:.1f} s) is past the end of the track "
+                              f"({duration:.1f} s).")
+    if begin + length > duration:
+        length = duration - begin
+        notes.append(f"the excerpt is shortened to {length:.1f} s at the end of the track")
     return begin, length, notes
 
 
@@ -246,6 +280,7 @@ def process_upload(
         stems={k: out / v for k, v in outs.get("stems", {}).items()},
         run_json=existing(outs.get("run")),
         run=result.report,
+        report_json=existing(outs.get("report")),
         expires_at=time.time() + ttl_s,
         notes=notes,
     )

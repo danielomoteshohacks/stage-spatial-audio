@@ -3,21 +3,84 @@
   "app": "SoundStage",
   "stage_version": "0.0.1",
   "created_utc": "2026-11-23T10:00:00Z",
-  "input": { "name": "track.flac", "start_s": 30.0, "requested_seconds": 30.0, "sample_rate": 44100, "channels": 2, "duration_s": 30.0 },
+  "input": {
+    "name": "track.flac",
+    "start_s": 30.0,
+    "requested_seconds": 30.0,
+    "sample_rate": 44100,
+    "channels": 2,
+    "duration_s": 30.0,
+    "start_mode": "auto",
+    "auto_start": {
+      "loudness_lufs": -9.4
+    }
+  },
   "requested_mode": "stems",
   "mode": "lite",
   "profile": "max",
   "beta": 2.0,
-  "fallback": { "from": "stems", "to": "lite", "reason": "SeparationUnavailable: Stem separation needs torch and demucs, which are not installed." },
+  "fallback": {
+    "from": "stems",
+    "to": "lite",
+    "reason": "SeparationUnavailable: Stem separation needs torch and demucs, which are not installed."
+  },
   "separation": null,
-  "levels": { "original_rms_dbfs": -18.2, "spatial_raw_rms_dbfs": -18.9, "spatial_rms_dbfs": -18.2, "peak_gain_db": 0.0, "peak_limited": false },
+  "levels": {
+    "original_rms_dbfs": -18.2,
+    "spatial_raw_rms_dbfs": -18.9,
+    "spatial_rms_dbfs": -18.2,
+    "peak_gain_db": 0.0,
+    "peak_limited": false
+  },
   "stages": [
-    { "name": "load", "status": "ok", "duration_s": 0.02, "error": null },
-    { "name": "separate", "status": "failed", "duration_s": 0.001, "error": "SeparationUnavailable: Stem separation needs torch and demucs, which are not installed." },
-    { "name": "render", "status": "ok", "duration_s": 4.1, "error": null },
-    { "name": "levels", "status": "ok", "duration_s": 0.01, "error": null },
-    { "name": "write", "status": "ok", "duration_s": 0.3, "error": null }
+    {
+      "name": "load",
+      "status": "ok",
+      "duration_s": 0.02,
+      "error": null
+    },
+    {
+      "name": "separate",
+      "status": "failed",
+      "duration_s": 0.001,
+      "error": "SeparationUnavailable: Stem separation needs torch and demucs, which are not installed."
+    },
+    {
+      "name": "render",
+      "status": "ok",
+      "duration_s": 4.1,
+      "error": null
+    },
+    {
+      "name": "levels",
+      "status": "ok",
+      "duration_s": 0.01,
+      "error": null
+    },
+    {
+      "name": "guard",
+      "status": "ok",
+      "duration_s": 1.2,
+      "error": null
+    },
+    {
+      "name": "write",
+      "status": "ok",
+      "duration_s": 0.3,
+      "error": null
+    }
   ],
-  "outputs": { "run": "run.json", "original": "original.flac", "spatial": "spatial.flac" },
-  "ok": true
+  "outputs": {
+    "run": "run.json",
+    "original": "original.flac",
+    "spatial": "spatial.flac",
+    "report": "report.json"
+  },
+  "ok": true,
+  "guard": {
+    "verdict": "review",
+    "reasons": [
+      "The tone changes by 3.6 dB around 3.15k Hz."
+    ]
+  }
 }

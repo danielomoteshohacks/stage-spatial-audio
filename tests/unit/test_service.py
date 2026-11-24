@@ -33,7 +33,7 @@ def test_lite_upload_returns_existing_outputs(track, root):
     assert res.expires_at > time.time()
 
 
-def test_default_excerpt_moves_earlier_for_a_short_track(track, root):
+def test_default_excerpt_uses_all_of_a_short_track(track, root):
     res = process_upload(track, ServiceOptions(profile="V0"), root=root)
     assert res.run["input"]["start_s"] == 0.0
     assert any("only 2.0 s long" in n for n in res.notes)
@@ -42,22 +42,42 @@ def test_default_excerpt_moves_earlier_for_a_short_track(track, root):
 @pytest.mark.parametrize(
     "duration,start,seconds,expected",
     [
-        (240.0, None, None, (30.0, 30.0)),  # the documented default
-        (45.0, None, None, (15.0, 30.0)),  # moved earlier so 30 s still fits
+        (240.0, None, None, ("auto", 30.0)),  # the default: the loudest 30 s
+        (240.0, "", "", ("auto", 30.0)),  # empty form fields mean the default
+        (240.0, "auto", "45", ("auto", 45.0)),
+        (20.0, None, 60.0, ("auto", 20.0)),  # the whole track: auto resolves to 0
         (240.0, 200.0, 60.0, (200.0, 40.0)),  # shortened at the end
-        (20.0, None, 60.0, (0.0, 20.0)),
+        (240.0, "12.5", 10, (12.5, 10.0)),  # text from the form is read as seconds
+        (240.0, 0, None, (0.0, 30.0)),  # an explicit 0 start is a real choice
     ],
 )
 def test_resolve_excerpt(duration, start, seconds, expected):
     begin, length, _ = resolve_excerpt(duration, start, seconds)
-    assert (begin, length) == pytest.approx(expected)
+    assert begin == expected[0] if isinstance(expected[0], str) else begin == pytest.approx(
+        expected[0])
+    assert length == pytest.approx(expected[1])
 
 
 @pytest.mark.parametrize("start,seconds", [(300.0, 10.0), (-1.0, 10.0), (0.0, 0.5),
-                                           (0.0, 500.0)])
+                                           (0.0, 500.0), (None, 0), (None, "0"), ("x", None),
+                                           (None, "nan")])
 def test_resolve_excerpt_rejects_bad_ranges(start, seconds):
     with pytest.raises(ValidationError):
         resolve_excerpt(240.0, start, seconds)
+
+
+def test_auto_start_lands_on_the_loudest_part(tmp_path, root):
+    # 40 s: quiet noise, with a loud section from 22 s to 32 s; a 10 s excerpt must find it.
+    fs = 22050
+    rng = np.random.default_rng(3)
+    x = 0.01 * rng.standard_normal((2, 40 * fs))
+    x[:, 22 * fs : 32 * fs] *= 30.0
+    path = tmp_path / "song.wav"
+    sf.write(str(path), x.T, fs, subtype="PCM_24")
+    res = process_upload(path, ServiceOptions(profile="V0", seconds=10), root=root)
+    assert res.run["input"]["start_mode"] == "auto"
+    assert res.run["input"]["start_s"] == pytest.approx(22.0, abs=0.15)
+    assert res.run["input"]["auto_start"]["loudness_lufs"] > -30
 
 
 def test_unsupported_extension_is_refused_with_the_allowed_list(tmp_path, root):

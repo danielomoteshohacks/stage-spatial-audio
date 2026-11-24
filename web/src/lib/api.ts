@@ -21,6 +21,8 @@ export interface RunReport {
   input: {
     name: string;
     start_s: number;
+    start_mode?: "auto" | "manual" | "file";
+    auto_start?: { loudness_lufs: number } | null;
     requested_seconds: number | null;
     sample_rate?: number;
     channels?: number;
@@ -73,6 +75,7 @@ export interface ProcessRequest {
   mode: "lite" | "stems";
   profile: string;
   beta: number;
+  /** Seconds into the track, or null for "auto": the backend picks the loudest window. */
   start: number | null;
   seconds: number | null;
 }
@@ -266,8 +269,9 @@ export function buildPayload(serverPath: string, fileName: string, req: ProcessR
       req.mode,
       req.profile,
       req.beta,
-      req.start,
-      req.seconds,
+      // Sent as text: the backend reads an empty field as its default ("auto" start, 30 s).
+      req.start === null ? "" : String(req.start),
+      req.seconds === null ? "" : String(req.seconds),
     ],
   };
 }

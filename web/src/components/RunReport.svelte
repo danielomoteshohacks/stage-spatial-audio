@@ -37,7 +37,7 @@
     <div><dt>Mode</dt><dd>{report.mode === "stems" ? "Stems" : "Lite"}{report.requested_mode !== report.mode ? ` (asked: ${report.requested_mode})` : ""}</dd></div>
     <div><dt>Profile</dt><dd>{profileInfo(report.profile).label} <code>{report.profile}</code></dd></div>
     <div><dt>Width</dt><dd><code>beta {report.beta.toFixed(2)}</code></dd></div>
-    <div><dt>Excerpt</dt><dd>{report.input.start_s.toFixed(1)} s, {audioSeconds.toFixed(1)} s long{report.input.sample_rate ? `, ${report.input.sample_rate} Hz` : ""}</dd></div>
+    <div><dt>Excerpt</dt><dd>{report.input.start_s.toFixed(1)} s{report.input.start_mode === "auto" ? " (loudest part)" : ""}, {audioSeconds.toFixed(1)} s long{report.input.sample_rate ? `, ${report.input.sample_rate} Hz` : ""}</dd></div>
     {#if report.separation}
       <div><dt>Separation</dt><dd><code>{report.separation.model}</code> on {report.separation.device}</dd></div>
       <div><dt>Residual SNR</dt><dd>{snr}</dd></div>

@@ -45,10 +45,26 @@ def test_process_streams_stages_and_ends_with_files(app, track):
     assert len(updates) >= 3
     first, last = updates[0][0], updates[-1][0]
     assert first["done"] is False and last["done"] is True and last["error"] is None
-    assert [s["status"] for s in last["stages"]] == ["ok", "skipped", "ok", "ok", "ok"]
+    assert [s["status"] for s in last["stages"]] == ["ok", "skipped", "ok", "ok", "ok", "ok"]
     _, original, spatial, stems, run_json = updates[-1]
     assert Path(original).exists() and Path(spatial).exists() and stems is None
     assert json.loads(Path(run_json).read_text())["ok"] is True
+    assert last["report"]["verdict"] in ("pass", "review", "fail")
+
+
+def test_empty_and_zero_lengths(app, track):
+    # Empty fields mean the defaults; a zero length is refused with a message, never rendered.
+    *_, last = app.process(str(track), "lite", "V0", 2.0, "", "")
+    assert last[0]["error"] is None and last[0]["run"]["input"]["start_mode"] == "auto"
+    *_, last = app.process(str(track), "lite", "V0", 2.0, "", "0")
+    assert "between" in last[0]["error"] and last[1:] == (None, None, None, None)
+
+
+def test_start_and_length_fields_are_single_text_boxes(app):
+    labels = [b.label for b in app.demo.blocks.values() if isinstance(b, gr.Textbox)]
+    assert labels.count("Start (seconds)") == 1
+    assert labels.count("Excerpt length (seconds)") == 1
+    assert not [b for b in app.demo.blocks.values() if isinstance(b, gr.Number)]
 
 
 def test_process_stems_with_a_fake_separator_returns_four_stem_files(app, track, fake_separator,

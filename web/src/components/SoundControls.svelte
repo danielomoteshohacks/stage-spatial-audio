@@ -22,7 +22,7 @@
     mode: "lite" | "stems";
     profile: string;
     beta: number;
-    start: number;
+    start: number | null;
     seconds: number;
     disabled?: boolean;
   } = $props();
@@ -31,18 +31,27 @@
   let maxStart = $derived(duration ? Math.max(0, duration - length) : 0);
   let fill = $derived(((beta - 1) / 1.4) * 100);
 
+  let auto = $derived(start === null);
+  let at = $derived(start ?? 0);
+
   $effect(() => {
-    if (start > maxStart) start = maxStart;
+    if (start !== null && start > maxStart) start = maxStart;
   });
 </script>
 
 <fieldset class="group" {disabled}>
   <legend class="eyebrow">Excerpt</legend>
-  {#if duration}
+  <div class="segmented" role="radiogroup" aria-label="Where to start">
+    <button type="button" role="radio" aria-checked={auto} onclick={() => (start = null)}>Loudest part</button>
+    <button type="button" role="radio" aria-checked={!auto} onclick={() => (start = at)}>Choose</button>
+  </div>
+  {#if auto}
+    <p class="faint">The backend finds the loudest stretch, usually the chorus or the drop.</p>
+  {:else if duration}
     <div class="excerpt">
       <label class="field-label" for="start">
-        Start at <span class="value">{formatTime(start)}</span>
-        <span class="faint">to {formatTime(start + length)} of {formatTime(duration)}</span>
+        Start at <span class="value">{formatTime(at)}</span>
+        <span class="faint">to {formatTime(at + length)} of {formatTime(duration)}</span>
       </label>
       <input
         id="start"
@@ -51,8 +60,8 @@
         max={maxStart}
         step="1"
         bind:value={start}
-        style:--fill={`${maxStart ? (start / maxStart) * 100 : 0}%`}
-        aria-valuetext={`${formatTime(start)} to ${formatTime(start + length)}`}
+        style:--fill={`${maxStart ? (at / maxStart) * 100 : 0}%`}
+        aria-valuetext={`${formatTime(at)} to ${formatTime(at + length)}`}
       />
     </div>
   {:else}
@@ -129,7 +138,7 @@
         <label class="sr-only" for="beta-num">Beta</label>
         <input id="beta-num" class="input mono" type="number" min="1" max="2.4" step="0.05" bind:value={beta} {disabled} />
       </dd>
-      <dt>excerpt</dt><dd><code>start={start}s seconds={seconds}</code></dd>
+      <dt>excerpt</dt><dd><code>start={start ?? "auto"} seconds={seconds}</code></dd>
     </dl>
     <p class="faint">
       Profiles V0 to V5 are the ablation chain of decision 0007: each adds one cue to the one before. <code>max</code> combines

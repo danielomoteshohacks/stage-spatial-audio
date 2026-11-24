@@ -48,13 +48,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mode", choices=MODES, default="lite")
     parser.add_argument("--profile", choices=sorted(PROFILES), default="max")
     parser.add_argument("--beta", type=float, default=2.0, help="widen strength, 1.0 to 2.4")
-    parser.add_argument("--start", type=float, default=None, help="excerpt start in seconds")
+    parser.add_argument("--start", default="auto",
+                        help='excerpt start in seconds, or "auto" (default) for the loudest part')
     parser.add_argument("--seconds", type=float, default=None, help="excerpt length in seconds")
     parser.add_argument("--out-dir", default="runs/latest")
     args = parser.parse_args(argv)
     try:
         result = run(args.path, mode=args.mode, profile=args.profile, beta=args.beta,
-                     start=args.start, seconds=args.seconds, out_dir=args.out_dir)
+                     start=args.start if args.start == "auto" else float(args.start),
+                     seconds=args.seconds, out_dir=args.out_dir)
     except ValueError as exc:
         parser.error(str(exc))
     print(_summary(result))

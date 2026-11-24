@@ -27,14 +27,16 @@ import soundfile as sf
 from numpy.typing import NDArray
 
 from stage import __version__
+from stage.analysis.excerpt import auto_start
 from stage.guard.levels import match_rms, peak_gain, rms
+from stage.guard.report import build_report
 from stage.io import read_audio, to_stereo
 from stage.render.profiles import PROFILES, render_profile
 from stage.render.sectors import WIDEN_BETA_MAX, WIDEN_BETA_MIN
 from stage.separation.demucs_sep import STEM_NAMES, Separation, separate
 
 MODES = ("lite", "stems")
-STAGES = ("load", "separate", "render", "levels", "write")
+STAGES = ("load", "separate", "render", "levels", "guard", "write")
 #: 24-bit FLAC: lossless like WAV at roughly half the size, which matters on mobile data.
 FLAC_SUBTYPE = "PCM_24"
 RUN_SCHEMA_VERSION = 1
@@ -144,7 +146,7 @@ def run(
     mode: str = "lite",
     profile: str = "max",
     beta: float = 2.0,
-    start: float | None = None,
+    start: float | str | None = "auto",
     seconds: float | None = None,
     out_dir: str | Path,
     separator: Separator | None = None,
@@ -157,7 +159,9 @@ def run(
         mode: "lite" renders the whole mix; "stems" separates first and renders each stem.
         profile: a name in `stage.render.profiles.PROFILES`.
         beta: widen strength, 1.0 to 2.4.
-        start, seconds: the excerpt; None means the start of the file and the whole file.
+        start: seconds into the file, None for the beginning, or "auto" for the loudest window
+            of length `seconds` (the chorus or drop, see stage.analysis.excerpt).
+        seconds: the excerpt length; None means the rest of the file.
         out_dir: created if needed; existing files of the same names are replaced.
         separator: called as separator(audio, sample_rate) -> Separation. Defaults to Demucs.
         on_stage: called with a dict per stage transition (running, then ok/failed/skipped).
@@ -170,6 +174,20 @@ def run(
         raise ValueError(f"beta must be in [{WIDEN_BETA_MIN}, {WIDEN_BETA_MAX}], got {beta}")
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    start_mode = "auto" if start == "auto" else ("file" if start is None else "manual")
+    auto_info: dict[str, float] | None = None
+    if start == "auto":
+        if seconds is None:
+            start = 0.0  # the whole file: there is no window to choose
+        else:
+            try:
+                found = auto_start(path, float(seconds))
+                start = found.start_s
+                auto_info = {"loudness_lufs": found.loudness_lufs}
+            except Exception:
+                # An unreadable file is reported by the load stage with its own error.
+                start = 0.0
+    start = float(start or 0.0)
     sep_fn: Separator = separator or partial(separate, model="htdemucs", device="auto")
     st = _Stages(STAGES, on_stage)
     effective_mode = mode
@@ -179,19 +197,21 @@ def run(
         "app": "SoundStage",
         "stage_version": __version__,
         "created_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "input": {"name": Path(path).name, "start_s": float(start or 0.0),
+        "input": {"name": Path(path).name, "start_s": start, "start_mode": start_mode,
+                  "auto_start": auto_info,
                   "requested_seconds": None if seconds is None else float(seconds)},
         "requested_mode": mode,
         "profile": profile,
         "beta": float(beta),
         "separation": None,
         "levels": None,
+        "guard": None,
     }
     outputs: dict[str, Any] = {}
 
     # load
     def _load() -> tuple[NDArray[np.float64], int, int]:
-        audio, sr = read_audio(path, start_s=start or 0.0, duration_s=seconds)
+        audio, sr = read_audio(path, start_s=start, duration_s=seconds)
         channels = audio.shape[0]
         audio = to_stereo(audio)
         if audio.shape[1] == 0:
@@ -279,6 +299,20 @@ def run(
         ok, leveled = st.run("levels", _levels)
         spatial = leveled if ok else None
 
+    # guard
+    guard_report: dict[str, Any] | None = None
+    if spatial is None:
+        st.skip("guard", "there is no render to check")
+    else:
+        def _guard() -> dict[str, Any]:
+            return build_report(audio, spatial, sr, {"engine": __version__, "profile": profile,
+                                                     "mode": effective_mode})
+
+        ok, guard_report = st.run("guard", _guard)
+        if ok:
+            report["guard"] = {"verdict": guard_report["verdict"],
+                               "reasons": guard_report["reasons"]}
+
     # write
     if audio is None:
         st.skip("write", "nothing was loaded")
@@ -290,6 +324,10 @@ def run(
                 return
             _write_flac(out / "spatial.flac", spatial, sr)
             outputs["spatial"] = "spatial.flac"
+            if guard_report is not None:
+                (out / "report.json").write_text(json.dumps(guard_report, indent=2),
+                                                 encoding="utf-8")
+                outputs["report"] = "report.json"
             if sep is not None and spatial_stems:
                 outputs["stems"], outputs["stems_spatial"] = {}, {}
                 for name in STEM_NAMES:

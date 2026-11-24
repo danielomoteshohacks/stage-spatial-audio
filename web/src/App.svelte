@@ -40,7 +40,8 @@
   let mode: "lite" | "stems" = $state("lite");
   let profile = $state("max");
   let beta = $state(2.0);
-  let start = $state(30);
+  /** null: let the backend start at the loudest part of the track. */
+  let start: number | null = $state(null);
   let seconds = $state(30);
 
   let phase: "idle" | "uploading" | "processing" | "downloading" = $state("idle");
@@ -103,7 +104,7 @@
     error = null;
     duration = await readDuration(f);
     // The backend's default: 30 s from 30 s in, moved earlier for short tracks.
-    start = duration ? Math.max(0, Math.min(30, Math.floor(duration - Math.min(seconds, duration)))) : 30;
+    start = null;
   }
 
   function audioContext(): AudioContext {

@@ -34,7 +34,7 @@ def test_lite_writes_original_and_spatial_of_the_input_length(track, tmp_path):
     result = pipeline.run(track, mode="lite", profile="V0", out_dir=out)
     assert result.ok and result.mode == "lite" and result.fallback is None
     assert _statuses(result) == {"load": "ok", "separate": "skipped", "render": "ok",
-                                 "levels": "ok", "write": "ok"}
+                                 "levels": "ok", "guard": "ok", "write": "ok"}
     n = sf.info(str(track)).frames
     assert _frames(out / "original.flac") == n and _frames(out / "spatial.flac") == n
     info = sf.info(str(out / "spatial.flac"))
@@ -121,7 +121,8 @@ def test_a_failing_render_never_crashes_the_run(track, tmp_path, monkeypatch):
     result = pipeline.run(track, profile="V0", out_dir=out)
     assert not result.ok
     assert _statuses(result) == {"load": "ok", "separate": "skipped", "render": "failed",
-                                 "levels": "skipped", "write": "ok"}
+                                 "levels": "skipped", "guard": "skipped",
+                                 "write": "ok"}
     assert "MemoryError" in result.stage("render").error
     assert (out / "original.flac").exists() and not (out / "spatial.flac").exists()
     assert _valid(out)["ok"] is False
@@ -132,7 +133,8 @@ def test_a_missing_file_fails_load_and_skips_the_rest(tmp_path):
     result = pipeline.run(tmp_path / "nope.wav", out_dir=out)
     assert not result.ok
     assert _statuses(result) == {"load": "failed", "separate": "skipped", "render": "skipped",
-                                 "levels": "skipped", "write": "skipped"}
+                                 "levels": "skipped", "guard": "skipped",
+                                 "write": "skipped"}
     assert _valid(out)["stages"][0]["error"]
 
 
@@ -152,7 +154,8 @@ def test_progress_events_arrive_in_order_and_a_broken_callback_is_harmless(track
     assert result.ok
     assert events == [("load", "running"), ("load", "ok"), ("separate", "skipped"),
                       ("render", "running"), ("render", "ok"), ("levels", "running"),
-                      ("levels", "ok"), ("write", "running"), ("write", "ok")]
+                      ("levels", "ok"), ("guard", "running"), ("guard", "ok"),
+                      ("write", "running"), ("write", "ok")]
 
 
 def test_stems_are_rendered_one_at_a_time(track, tmp_path, fake_separator, monkeypatch):

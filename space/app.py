@@ -11,6 +11,7 @@ files. Only the separation call asks for a GPU: on ZeroGPU the free quota is cha
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import time
@@ -33,8 +34,10 @@ from stage.render.sectors import WIDEN_BETA_MAX, WIDEN_BETA_MIN  # noqa: E402
 from stage.separation.demucs_sep import Separation, separate  # noqa: E402
 from stage.service import (  # noqa: E402
     ALLOWED_EXTENSIONS,
+    DEFAULT_SECONDS,
     DEFAULT_TTL_S,
     MAX_EXCERPT_S,
+    MIN_EXCERPT_S,
     WORK_ROOT,
     ServiceOptions,
     start_sweeper,
@@ -58,6 +61,15 @@ def _separate(audio, sample_rate: int) -> Separation:
 gpu_separate = spaces.GPU(duration=GPU_DURATION_S)(_separate) if spaces is not None else _separate
 
 
+def _read_json(path) -> Any:
+    if path is None:
+        return None
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
 def _progress(stages: dict[str, dict[str, Any]], **extra: Any) -> dict[str, Any]:
     return {"stages": [stages[name] for name in STAGES], **extra}
 
@@ -70,11 +82,12 @@ def process(audio_file, mode, profile, beta, start, seconds):
         yield _progress(stages, done=True, error="No file was uploaded."), None, None, None, None
         return
     path = audio_file if isinstance(audio_file, str) else getattr(audio_file, "name", audio_file)
+    # Start and length arrive as text (or numbers from older clients); empty means the default
+    # and the service validates both, so a bad value comes back as a message, not a crash.
     options = ServiceOptions(
         mode=mode or "lite", profile=profile or "max",
         beta=float(beta) if beta is not None else 2.0,
-        start=None if start is None or start == "" else float(start),
-        seconds=None if seconds is None or seconds == "" else float(seconds),
+        start=start, seconds=seconds,
     )
     yield _progress(stages, done=False, error=None), None, None, None, None
     for event in stream_process_upload(path, options, separator=gpu_separate):
@@ -90,6 +103,7 @@ def process(audio_file, mode, profile, beta, start, seconds):
             yield (
                 _progress(stages, done=True, error=None if res.ok else "Rendering failed; see "
                           "the stage list for the reason.", run=res.run, notes=res.notes,
+                          report=_read_json(res.report_json),
                           expires_in_s=round(res.expires_at - time.time())),
                 str(res.original) if res.original else None,
                 str(res.spatial) if res.spatial else None,
@@ -113,8 +127,14 @@ def build() -> gr.Blocks:
                 profile = gr.Dropdown(sorted(PROFILES), value="max", label="Profile")
                 beta = gr.Slider(WIDEN_BETA_MIN, WIDEN_BETA_MAX, value=2.0, step=0.05,
                                  label="Width (beta)")
-                start = gr.Number(value=None, label="Start (s); empty for the default")
-                seconds = gr.Number(value=None, label=f"Length (s, at most {MAX_EXCERPT_S:.0f})")
+                # Text boxes, not gr.Number: a Number shows 0 when it is empty, which reads as a
+                # choice and would send a 0-second length. Empty here means the default.
+                start = gr.Textbox(value="", label="Start (seconds)", placeholder="auto",
+                                   info="Empty starts at the loudest part of the track.")
+                seconds = gr.Textbox(value="", label="Excerpt length (seconds)",
+                                     placeholder=f"{DEFAULT_SECONDS:.0f}",
+                                     info=f"Empty for {DEFAULT_SECONDS:.0f} s; "
+                                          f"{MIN_EXCERPT_S:.0f} to {MAX_EXCERPT_S:.0f} s.")
                 go = gr.Button("Process", variant="primary")
             with gr.Column():
                 progress = gr.JSON(label="Progress and run report")

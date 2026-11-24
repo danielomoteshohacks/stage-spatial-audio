@@ -49,6 +49,7 @@ export const STAGE_LABELS: Record<string, string> = {
   separate: "Separating stems",
   render: "Rendering the stage",
   levels: "Matching loudness",
+  guard: "Checking fidelity",
   write: "Writing files",
 };
 
