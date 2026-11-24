@@ -11,6 +11,7 @@ The renderer itself (`stage.render`) is the reviewed reference and is only calle
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 import time
@@ -29,15 +30,22 @@ from stage import __version__
 from stage.analysis.excerpt import auto_start
 from stage.engines import DEFAULT_PROFILE, check_profile, is_v2
 from stage.engines import render as render_engine
-from stage.guard.levels import peak_gain, rms
+from stage.guard.levels import limit_peak, peak_gain, rms
 from stage.guard.report import build_report
 from stage.io import read_audio, to_stereo
 from stage.render.sectors import WIDEN_BETA_MAX, WIDEN_BETA_MIN
+from stage.scene.analysis import analyse_song
+from stage.scene.genre import detect_genre
+from stage.scene.plan import build_plan, plan_json, templates, validate_plan
+from stage.scene.render import render_scene
 from stage.separation.chain import separate_chain
 from stage.separation.demucs_sep import STEM_NAMES, Separation
+from stage.spatial.neutral import split_low_high
 
 MODES = ("lite", "stems")
-STAGES = ("load", "separate", "render", "levels", "guard", "write")
+STAGES = ("load", "separate", "analyse", "render", "levels", "guard", "write")
+#: The default motion depth of the plan (0 is a static scene, 1 the template's full motion).
+DEFAULT_MOTION = 0.5
 #: 24-bit FLAC: lossless like WAV at roughly half the size, which matters on mobile data.
 FLAC_SUBTYPE = "PCM_24"
 RUN_SCHEMA_VERSION = 1
@@ -152,6 +160,11 @@ def run(
     out_dir: str | Path,
     separator: Separator | None = None,
     on_stage: StageCallback | None = None,
+    genre: str | None = None,
+    motion: float = DEFAULT_MOTION,
+    plan: dict[str, Any] | None = None,
+    export_bed: bool = False,
+    tag_genre: bool = True,
 ) -> RunResult:
     """Process one file and write original.flac, spatial.flac, stems (stems mode) and run.json.
 
@@ -166,10 +179,19 @@ def run(
         out_dir: created if needed; existing files of the same names are replaced.
         separator: called as separator(audio, sample_rate) -> Separation. Defaults to Demucs.
         on_stage: called with a dict per stage transition (running, then ok/failed/skipped).
+        genre: a template name, or None to let the tagger choose (or the default template).
+        motion: motion depth 0 to 1 for the v2 scene.
+        plan: an edited plan.json to render instead of building one (the /rerender path).
+        export_bed: also write the 7.1.4 bed and objects as a 12-channel WAV.
+        tag_genre: run the AudioSet tagger when no genre is given (where it is installed).
     """
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
     check_profile(profile)
+    if not 0.0 <= float(motion) <= 1.0:
+        raise ValueError(f"motion must be between 0 and 1, got {motion}")
+    if plan is not None:
+        validate_plan(plan)
     if not WIDEN_BETA_MIN <= beta <= WIDEN_BETA_MAX:
         raise ValueError(f"beta must be in [{WIDEN_BETA_MIN}, {WIDEN_BETA_MAX}], got {beta}")
     out = Path(out_dir)
@@ -189,6 +211,7 @@ def run(
                 start = 0.0
     start = float(start or 0.0)
     sep_fn: Separator = separator or separate_chain
+    track_id = f"{Path(path).stem[:40]}-{start:.1f}s"
     st = _Stages(STAGES, on_stage)
     effective_mode = mode
     fallback: dict[str, str] | None = None
@@ -207,6 +230,7 @@ def run(
         "levels": None,
         "guard": None,
         "engine": None,
+        "analysis": None,
     }
     outputs: dict[str, Any] = {}
 
@@ -249,13 +273,65 @@ def run(
                 "details": dict(sep.details),
             }
 
+    # analyse: song analysis, genre and the plan (v2 only)
+    scene_plan: dict[str, Any] | None = None
+    if audio is None:
+        st.skip("analyse", "nothing was loaded")
+    elif not is_v2(profile):
+        st.skip("analyse", "the v1 profiles have no plan")
+    else:
+        def _analyse() -> dict[str, Any]:
+            stems = sep.stems if sep is not None else None
+            song = analyse_song(audio, sr, stems)
+            report["analysis"] = {"tempo_bpm": round(song.tempo_bpm, 2),
+                                  "sections": len(song.sections),
+                                  "beats": len(song.beats_s), "method": song.method}
+            if plan is not None:
+                given = copy.deepcopy(plan)
+                given["mode"] = "stems" if sep is not None else "lite"
+                report["analysis"]["genre"] = {"genre": given.get("genre"), "source": "plan"}
+                return given
+            if genre:
+                chosen = {"genre": genre, "scores": {}, "source": "user", "detail": None}
+            elif tag_genre:
+                chosen = detect_genre(audio, sr, templates())
+            else:
+                chosen = {"genre": None, "scores": {}, "source": "default",
+                          "detail": "tagging off"}
+            report["analysis"]["genre"] = chosen
+            return build_plan(song, track_id=track_id, mode="stems" if sep else "lite",
+                              genre=chosen["genre"], space=profile[len("space:"):],
+                              motion_depth=float(motion), genre_source=chosen["source"],
+                              genre_scores=chosen["scores"]), song
+        ok, made = st.run("analyse", _analyse)
+        if ok:
+            scene_plan, song = made if isinstance(made, tuple) else (made, None)
+            if song is not None:
+                report["analysis"]["song"] = song.as_dict()
+
     # render
     spatial: NDArray[np.float64] | None = None
     spatial_stems: dict[str, NDArray[np.float64]] = {}
+    scene_objects: dict[str, NDArray[np.float64]] = {}
+    bed: NDArray[np.float64] | None = None
     if audio is None:
         st.skip("render", "nothing was loaded")
+    elif is_v2(profile) and scene_plan is None:
+        st.skip("render", "there is no plan to render")
     else:
         def _render() -> NDArray[np.float64]:
+            nonlocal bed
+            if scene_plan is not None:
+                res = render_scene(audio, sr, scene_plan, sep.stems if sep else None,
+                                   export_bed=export_bed)
+                report["engine"] = res.info
+                low, _ = split_low_high(audio, sr, float(scene_plan.get("crossover_hz", 120.0)))
+                # The untouched low band is an object of its own, so the object stems sum to the
+                # render exactly and soloing them in the player stays honest.
+                scene_objects["low_end"] = low
+                scene_objects.update(res.objects)
+                bed = res.bed
+                return res.binaural
             if sep is None:
                 y, info = render_engine(audio, sr, profile, beta)
                 report["engine"] = info
@@ -295,9 +371,12 @@ def run(
             # below the ceiling on its own.
             peaks = [float(np.max(np.abs(matched)))]
             peaks += [scale * float(np.max(np.abs(y))) for y in spatial_stems.values()]
+            peaks += [scale * float(np.max(np.abs(y))) for y in scene_objects.values()]
             gain = peak_gain(max(peaks))
             for name in list(spatial_stems):
                 spatial_stems[name] = spatial_stems[name] * (scale * gain)
+            for name in list(scene_objects):
+                scene_objects[name] = scene_objects[name] * (scale * gain)
             leveled = matched * gain
             report["levels"] = {
                 "original_rms_dbfs": _db(target),
@@ -340,6 +419,22 @@ def run(
                 (out / "report.json").write_text(json.dumps(guard_report, indent=2),
                                                  encoding="utf-8")
                 outputs["report"] = "report.json"
+            if scene_plan is not None:
+                (out / "plan.json").write_text(plan_json(scene_plan), encoding="utf-8")
+                outputs["plan"] = "plan.json"
+            if scene_objects:
+                outputs["objects"] = {}
+                for name, y in scene_objects.items():
+                    _write_flac(out / "objects" / f"{name}.flac", y, sr)
+                    outputs["objects"][name] = f"objects/{name}.flac"
+            if bed is not None:
+                # The 7.1.4 export for producers: a 12-channel 24-bit WAV in the ITU-R BS.2051
+                # System J order (L R C LFE Ls Rs Lrs Rrs Ltf Rtf Ltr Rtr), with its own peak
+                # safety because loudspeaker feeds sum differently from headphone signals.
+                data, _ = limit_peak(bed)
+                path = out / "bed_7_1_4.wav"
+                sf.write(str(path), data.T, sr, subtype="PCM_24")
+                outputs["bed_7_1_4"] = "bed_7_1_4.wav"
             if sep is not None and spatial_stems:
                 outputs["stems"], outputs["stems_spatial"] = {}, {}
                 for name in STEM_NAMES:

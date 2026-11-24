@@ -266,3 +266,34 @@ Phase 2A: the SoundStage Separator (research note first).
 ### Next
 
 The owner runs the Kaggle notebook (four runs, about 25 GPU hours). Phase 2B: the spatial scene.
+
+## 2026-11-24: v2 Phases 2B and 3, the spatial scene and the mix plan
+
+### Done
+
+- `stage.scene`: analysis (tempo, beats, downbeats, sections, energy, stem activity), the AST
+  genre tagger with a licence check, ten genre templates as data, the deterministic plan
+  (`schemas/plan.schema.json` v2), velvet-noise decorrelators with transient gating, and the
+  scene renderer (decomposition, virtual-source objects, section breathing, tempo-locked motion,
+  distance cues, the 7.1.4 bed export).
+- Pipeline stage `analyse`; v2 writes plan.json and per-object spatial stems (which with the low
+  end sum to spatial.flac); the Space returns the object stems to the web app's mixer.
+- `stage.testsongs`: deterministic generated multitrack songs for tests and the benchmark.
+
+### Measured
+
+Table in decision 0016: three stems scenes pass the guard with bass correlation 0.9995 to 0.9999
+and no artifact flags; render 23 to 29 s per 30 s on the build machine (too slow, Phase 4).
+
+### What went wrong
+
+- Reverb and decorrelated bed energy around the crossover changed the bass region by 6.4 dB;
+  everything but the direct path is now high-passed at 200 Hz (0016).
+- Object stems did not sum to the render when an original blend was set; the blend now lives
+  inside each object stem.
+- The guard's alignment estimator was tuned twice more; it reads 0.02 ms on every space and on
+  the stems scene, but still about 1.5 ms on the Lite scene of the synthetic song (0016).
+
+### Next
+
+Phase 4: speed, the per-track cache, outputs and /rerender.

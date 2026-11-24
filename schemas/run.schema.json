@@ -21,7 +21,8 @@
     "outputs",
     "ok",
     "guard",
-    "engine"
+    "engine",
+    "analysis"
   ],
   "properties": {
     "schema_version": {
@@ -285,8 +286,8 @@
     },
     "stages": {
       "type": "array",
-      "minItems": 6,
-      "maxItems": 6,
+      "minItems": 7,
+      "maxItems": 7,
       "items": {
         "type": "object",
         "required": [
@@ -300,6 +301,7 @@
             "enum": [
               "load",
               "separate",
+              "analyse",
               "render",
               "levels",
               "guard",
@@ -347,6 +349,19 @@
         },
         "report": {
           "const": "report.json"
+        },
+        "plan": {
+          "const": "plan.json"
+        },
+        "objects": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "\\.flac$"
+          }
+        },
+        "bed_7_1_4": {
+          "const": "bed_7_1_4.wav"
         }
       },
       "additionalProperties": false
@@ -398,6 +413,18 @@
         {
           "type": "object",
           "description": "v2 engine details: HRTF set, space, crossover, timbre matcher.",
+          "additionalProperties": true
+        }
+      ]
+    },
+    "analysis": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "description": "Song analysis and the genre choice (decision 0016).",
           "additionalProperties": true
         }
       ]

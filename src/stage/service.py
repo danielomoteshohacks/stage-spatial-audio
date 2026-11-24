@@ -61,6 +61,8 @@ class ServiceResult:
     original: Path | None
     spatial: Path | None
     stems_spatial: dict[str, Path]
+    objects: dict[str, Path]
+    plan_json: Path | None
     stems: dict[str, Path]
     run_json: Path | None
     run: dict[str, Any]
@@ -277,6 +279,8 @@ def process_upload(
         original=existing(outs.get("original")),
         spatial=existing(outs.get("spatial")),
         stems_spatial={k: out / v for k, v in outs.get("stems_spatial", {}).items()},
+        objects={k: out / v for k, v in outs.get("objects", {}).items()},
+        plan_json=existing(outs.get("plan")),
         stems={k: out / v for k, v in outs.get("stems", {}).items()},
         run_json=existing(outs.get("run")),
         run=result.report,

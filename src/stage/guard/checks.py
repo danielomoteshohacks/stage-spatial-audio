@@ -107,8 +107,9 @@ def check_alignment(
     Two steps. First the onset functions of both (the rise of high-band energy, 0.5 ms hops)
     are cross-correlated: transients mark time even in a reverberant render, where a waveform
     cross-correlation is dominated by reverberation and by the periodic, sign-alternating side
-    peaks of bass notes and sustained chords. Then the waveforms are cross-correlated within
-    +/-1 ms of that lag for sample precision. Material without transients falls back to the
+    peaks of bass notes and sustained chords. Then the 1 to 8 kHz waveforms are cross-correlated
+    within +/-3 ms of that lag, and the earliest peak within 6 dB of the largest is taken.
+    Material without transients falls back to the
     waveform correlation over the whole range. The reported correlation is the normalised
     correlation at the lag, so an inverted render still shows a negative value.
     """
@@ -124,6 +125,8 @@ def check_alignment(
     plain = np.fft.irfft(cross, nfft)
     # The fine search uses 1 to 8 kHz only: below that, the periods of notes are long enough
     # to put a correlation peak anywhere within the +/-1 ms window.
+    # The fine search uses 1 to 8 kHz only: below that, the periods of notes are long enough
+    # to put a correlation peak anywhere within the window.
     freqs = np.fft.rfftfreq(nfft, d=1.0 / sample_rate)
     banded = np.fft.irfft(cross * ((freqs >= 1000.0) & (freqs <= 8000.0)), nfft)
     max_lag = int(round(search_ms * 1e-3 * sample_rate))
@@ -132,8 +135,8 @@ def check_alignment(
         lags = np.arange(lo, hi + 1)
         mag = np.abs(values[lags % nfft])
         if earliest:
-            # The direct sound arrives before its reflections: take the first peak within 6 dB
-            # of the largest, not a reflection that the room happened to make stronger.
+            # The direct sound arrives before its reflections: take the first local peak within
+            # 6 dB of the largest, not a reflection that the room happened to make stronger.
             peaks = np.zeros(mag.size, dtype=bool)
             peaks[1:-1] = (mag[1:-1] >= mag[:-2]) & (mag[1:-1] >= mag[2:])
             peaks[int(np.argmax(mag))] = True
@@ -150,7 +153,10 @@ def check_alignment(
         k = max_lag // hop
         cand = np.concatenate([np.arange(0, k + 1), np.arange(-k, 0)])
         coarse = int(cand[int(np.argmax(xc[cand % m]))]) * hop
-        refine = int(round(0.001 * sample_rate)) + hop
+        # Early reflections add their own onsets a few milliseconds after the direct sound and
+        # pull the envelope correlation late, so the fine search reaches 3 ms either side and
+        # takes the earliest strong peak, which is the direct sound.
+        refine = int(round(0.003 * sample_rate)) + hop
         lag = best_in(max(-max_lag, coarse - refine), min(max_lag, coarse + refine), banded,
                       earliest=True)
     if lag is None:

@@ -95,6 +95,14 @@ def correction_filter(centres: NDArray, corr_db: NDArray, sample_rate: int,
     return h * np.hanning(2 * taps)[taps:]  # a gentle tail taper; the head is untouched
 
 
+def timbre_filter(original_high: NDArray, render_high: NDArray, sample_rate: int
+                  ) -> tuple[NDArray[np.float64], dict[str, float]]:
+    """The correction FIR alone, so the same filter can be applied to every object stem."""
+    centres, corr = timbre_correction_db(original_high, render_high, sample_rate)
+    return correction_filter(centres, corr, sample_rate), {
+        "max_correction_db": round(float(np.max(np.abs(corr))), 2), "bands": int(centres.size)}
+
+
 def match_timbre(original_high: NDArray, render_high: NDArray, sample_rate: int
                  ) -> tuple[NDArray[np.float64], dict[str, float]]:
     """Apply the correction to both ears of the rendered upper band; return it and a summary."""

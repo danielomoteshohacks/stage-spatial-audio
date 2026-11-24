@@ -45,7 +45,8 @@ def test_process_streams_stages_and_ends_with_files(app, track):
     assert len(updates) >= 3
     first, last = updates[0][0], updates[-1][0]
     assert first["done"] is False and last["done"] is True and last["error"] is None
-    assert [s["status"] for s in last["stages"]] == ["ok", "skipped", "ok", "ok", "ok", "ok"]
+    assert [s["status"] for s in last["stages"]] == ["ok", "skipped", "skipped", "ok", "ok", "ok",
+                                                     "ok"]
     _, original, spatial, stems, run_json = updates[-1]
     assert Path(original).exists() and Path(spatial).exists() and stems is None
     assert json.loads(Path(run_json).read_text())["ok"] is True

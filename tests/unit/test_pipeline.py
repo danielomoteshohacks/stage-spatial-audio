@@ -33,7 +33,8 @@ def test_lite_writes_original_and_spatial_of_the_input_length(track, tmp_path):
     out = tmp_path / "out"
     result = pipeline.run(track, mode="lite", profile="V0", out_dir=out)
     assert result.ok and result.mode == "lite" and result.fallback is None
-    assert _statuses(result) == {"load": "ok", "separate": "skipped", "render": "ok",
+    assert _statuses(result) == {"load": "ok", "separate": "skipped",
+                                 "analyse": "skipped", "render": "ok",
                                  "levels": "ok", "guard": "ok", "write": "ok"}
     n = sf.info(str(track)).frames
     assert _frames(out / "original.flac") == n and _frames(out / "spatial.flac") == n
@@ -59,7 +60,8 @@ def test_stems_mode_writes_dry_and_spatial_stems_that_sum_to_the_render(
     result = pipeline.run(track, mode="stems", profile="V0", out_dir=out,
                           separator=fake_separator)
     assert result.ok and result.mode == "stems"
-    assert all(s == "ok" for s in _statuses(result).values())
+    # v1 profiles have no plan, so analyse is skipped; everything else ran.
+    assert all(s == "ok" for k, s in _statuses(result).items() if k != "analyse")
     n = sf.info(str(track)).frames
     total = np.zeros((n, 2))
     for name in STEM_NAMES:
@@ -120,7 +122,8 @@ def test_a_failing_render_never_crashes_the_run(track, tmp_path, monkeypatch):
     out = tmp_path / "out"
     result = pipeline.run(track, profile="V0", out_dir=out)
     assert not result.ok
-    assert _statuses(result) == {"load": "ok", "separate": "skipped", "render": "failed",
+    assert _statuses(result) == {"load": "ok", "separate": "skipped",
+                                 "analyse": "skipped", "render": "failed",
                                  "levels": "skipped", "guard": "skipped",
                                  "write": "ok"}
     assert "MemoryError" in result.stage("render").error
@@ -132,7 +135,8 @@ def test_a_missing_file_fails_load_and_skips_the_rest(tmp_path):
     out = tmp_path / "out"
     result = pipeline.run(tmp_path / "nope.wav", out_dir=out)
     assert not result.ok
-    assert _statuses(result) == {"load": "failed", "separate": "skipped", "render": "skipped",
+    assert _statuses(result) == {"load": "failed", "separate": "skipped",
+                                 "analyse": "skipped", "render": "skipped",
                                  "levels": "skipped", "guard": "skipped",
                                  "write": "skipped"}
     assert _valid(out)["stages"][0]["error"]
@@ -153,6 +157,7 @@ def test_progress_events_arrive_in_order_and_a_broken_callback_is_harmless(track
     result = pipeline.run(track, profile="V0", out_dir=tmp_path / "o", on_stage=on_stage)
     assert result.ok
     assert events == [("load", "running"), ("load", "ok"), ("separate", "skipped"),
+                      ("analyse", "skipped"),
                       ("render", "running"), ("render", "ok"), ("levels", "running"),
                       ("levels", "ok"), ("guard", "running"), ("guard", "ok"),
                       ("write", "running"), ("write", "ok")]

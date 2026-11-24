@@ -46,6 +46,12 @@
       "error": "SeparationUnavailable: Stem separation needs torch and demucs, which are not installed."
     },
     {
+      "name": "analyse",
+      "status": "skipped",
+      "duration_s": 0.0,
+      "error": "lite fallback"
+    },
+    {
       "name": "render",
       "status": "ok",
       "duration_s": 4.1,
@@ -93,5 +99,6 @@
       "bands": 22,
       "upper_gain_db": -9.8
     }
-  }
+  },
+  "analysis": null
 }

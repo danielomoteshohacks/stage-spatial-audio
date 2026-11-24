@@ -106,7 +106,10 @@ def process(audio_file, mode, profile, beta, start, seconds):
             yield _progress(stages, done=True, error=event["message"]), None, None, None, None
         else:
             res = event["result"]
-            stems = [str(res.stems_spatial[k]) for k in sorted(res.stems_spatial)] or None
+            # v2 returns its per-object spatial stems (lead vocal, percussion, pads, low end...),
+            # which sum to spatial.flac; v1 returns its four spatial stems.
+            parts = res.objects or res.stems_spatial
+            stems = [str(parts[k]) for k in sorted(parts)] or None
             yield (
                 _progress(stages, done=True, error=None if res.ok else "Rendering failed; see "
                           "the stage list for the reason.", run=res.run, notes=res.notes,
@@ -175,6 +178,13 @@ def fetch_assets() -> None:
             print(f"HRTF pack ready: {download_pack()}", flush=True)
         except Exception as exc:  # the analytic fallback keeps the Space working
             print(f"HRTF pack unavailable, using the analytic head: {exc}", flush=True)
+        try:
+            from stage.scene.genre import _load as load_tagger
+
+            load_tagger()
+            print("genre tagger ready", flush=True)
+        except Exception as exc:
+            print(f"genre tagger unavailable, templates default to pop: {exc}", flush=True)
         weights = fetch_weights()
         print(f"SoundStage Separator weights: {weights or 'not published yet; the teacher runs'}",
               flush=True)

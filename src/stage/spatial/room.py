@@ -328,10 +328,12 @@ class Brir:
 
 
 def brir(space: Space, hrtf: HrtfSet, az_deg: float, el_deg: float, distance_m: float,
-         reverb_scale: float = 1.0, early_scale: float = 1.0) -> Brir:
+         reverb_scale: float = 1.0, early_scale: float = 1.0,
+         direct_extra_db: NDArray | None = None) -> Brir:
     """The three parts of the binaural response for a source at (az, el, distance).
 
-    The direct part has unit gain (distance level cues are applied by the scene, decision 0015).
+    The direct part has unit gain (distance level cues are applied by the scene, decision 0016);
+    `direct_extra_db` (2, K) shapes it, for air absorption and near-field level differences.
     Early and late are scaled so their sum's energy over the direct's is (r / r_c)^2 at the
     source's actual distance, as in a diffuse room, unless the images alone already exceed it.
     """
@@ -344,7 +346,7 @@ def brir(space: Space, hrtf: HrtfSet, az_deg: float, el_deg: float, distance_m: 
     az = float(np.degrees(np.arctan2(rel[1], rel[0])))
     el = float(np.degrees(np.arctan2(rel[2], np.hypot(rel[0], rel[1]))))
     direct = np.zeros((2, n))
-    h = hrtf.hrirs(az, el)[0]
+    h = hrtf.hrirs(az, el, direct_extra_db)[0]
     direct[:, : h.shape[1]] = h
     early = np.zeros((2, n))
     er = early_reflections(space, hrtf, src, n)
