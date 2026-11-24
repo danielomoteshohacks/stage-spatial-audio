@@ -66,10 +66,11 @@ def record_licence(rec: dict) -> str:
     return str(lic.get("id", lic) if isinstance(lic, dict) else lic).lower()
 
 
-def pick_d1_archive(files: list[dict]) -> dict:
-    """The subject D1 file of the record, or the whole-database archive if D1 is not separate."""
+def pick_archive(files: list[dict], subject: str = "D1") -> dict:
+    """The subject's file of the record, or the whole-database archive if it is not separate."""
     names = [f["key"] for f in files]
-    d1 = [f for f in files if fnmatch.fnmatch(f["key"].lower(), "*d1*")]
+    exact = [f for f in files if f["key"].lower() in (f"{subject.lower()}.zip", subject.lower())]
+    d1 = exact or [f for f in files if fnmatch.fnmatch(f["key"].lower(), f"*{subject.lower()}*")]
     if d1:
         return max(d1, key=lambda f: f.get("size", 0))
     zips = [f for f in files if f["key"].lower().endswith(".zip")]
@@ -135,7 +136,11 @@ def main() -> None:
     ap.add_argument("--record", default=ZENODO_RECORD)
     ap.add_argument("--sofa", help="use a local SOFA file instead of downloading")
     ap.add_argument("--cache", help="folder to keep the downloaded archive in between runs")
+    ap.add_argument("--subject", default="D1",
+                    help="SADIE II subject: D1 (Neumann KU100), D2 (KEMAR), H3 to H20 (humans)")
     args = ap.parse_args()
+    subject = args.subject.upper()
+    pack_name = PACK_NAME if subject == "D1" else f"sadie2-{subject.lower()}.npz"
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     manifest: dict = {"attribution": ATTRIBUTION, "licence": "Apache-2.0"}
@@ -153,7 +158,7 @@ def main() -> None:
             raise SystemExit(f"licence is {licence!r}, not Apache-2.0: stopping")
         listing = rec.get("files", [])
         print("record files:", [(f["key"], f.get("size")) for f in listing])
-        chosen = pick_d1_archive(listing)
+        chosen = pick_archive(listing, subject)
         url = chosen["links"].get("self") or chosen["links"].get("download")
         cached = Path(args.cache) / chosen["key"] if args.cache else None
         if cached is not None and cached.is_file():
@@ -177,7 +182,7 @@ def main() -> None:
             "licence_id": licence, "file": chosen["key"], "url": url, "md5": md5,
         }
         files = {k: v for k, v in files.items()
-                 if "d1" in k.lower() or chosen["key"].lower().find("d1") >= 0}
+                 if subject.lower() in k.lower() or subject.lower() in chosen["key"].lower()}
 
     names = sorted(files)
     # The archive holds tens of thousands of per-direction WAVs; the manifest keeps the SOFA
@@ -195,7 +200,9 @@ def main() -> None:
     if ir.ndim == 4:  # (M, R, E, N): take the first emitter
         ir = ir[:, :, 0, :]
     pack = process_hrirs(ir, sofa["fs"], sofa["az"], sofa["el"], meta={
-        "dataset": "SADIE II", "subject": "D1 (Neumann KU100)", "sofa_file": hrir_name,
+        "dataset": "SADIE II",
+        "subject": f"{subject} ({'Neumann KU100' if subject == 'D1' else 'see ListenerShortName'})",
+        "sofa_file": hrir_name,
         "sofa_attributes": {k: sofa["attrs"][k] for k in sorted(sofa["attrs"])
                             if k in ("Title", "License", "Organization", "AuthorContact",
                                      "DatabaseName", "ListenerShortName", "SOFAConventions",
@@ -207,17 +214,20 @@ def main() -> None:
     # grid with the least smoothing that keeps azimuth movement continuous (decision 0012).
     pack, continuity = choose_smoothing(pack, int(sofa["fs"]))
     print("smoothing", pack.meta["spatial_smoothing_deg"], "continuity", continuity)
-    digest = write_pack(pack, out / PACK_NAME)
-    manifest["pack"] = {"file": PACK_NAME, "sha256": digest,
-                        "bytes": (out / PACK_NAME).stat().st_size,
+    digest = write_pack(pack, out / pack_name)
+    manifest["pack"] = {"file": pack_name, "sha256": digest, "subject": subject,
+                        "listener": sofa["attrs"].get("ListenerShortName", ""),
+                        "bytes": (out / pack_name).stat().st_size,
                         "directions": pack.n_directions, "bins": int(pack.freqs_hz.size),
                         "sample_rate": sofa["fs"], "sofa_file": hrir_name,
                         "measured_directions": int(ir.shape[0]),
                         "smoothing_deg": pack.meta["spatial_smoothing_deg"],
                         "continuity": continuity}
-    print(f"pack {PACK_NAME}: {manifest['pack']['bytes'] / 2**20:.2f} MB, sha256 {digest}")
+    print(f"pack {pack_name}: {manifest['pack']['bytes'] / 2**20:.2f} MB, sha256 {digest}")
 
     brirs = [n for n in names if n.lower().endswith(".sofa") and "brir" in n.lower()]
+    if subject != "D1":
+        brirs = []  # the room reference is the studio's, measured with D1 only
     reference = []
     brir48 = [n for n in brirs if "48k" in n.lower()]
     if brir48:
@@ -244,10 +254,13 @@ def main() -> None:
             m = brir_metrics(bir[idx], b["fs"])
             m.update(file=name, az_deg=float(b["az"][idx]), el_deg=float(b["el"][idx]))
             reference.append(m)
-    (out / "brir_reference.json").write_text(json.dumps(
-        {"brir_files": brirs, "measurements": reference, "attribution": ATTRIBUTION}, indent=2))
+    if subject == "D1":
+        (out / "brir_reference.json").write_text(json.dumps(
+            {"brir_files": brirs, "measurements": reference, "attribution": ATTRIBUTION},
+            indent=2))
     manifest["brir_files"] = brirs
-    (out / "manifest.json").write_text(json.dumps(manifest, indent=2))
+    (out / ("manifest.json" if subject == "D1" else f"manifest-{subject.lower()}.json")
+     ).write_text(json.dumps(manifest, indent=2))
     print(json.dumps({k: v for k, v in manifest.items() if k != "notice_text"}, indent=2))
 
 

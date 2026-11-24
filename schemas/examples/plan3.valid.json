@@ -1,0 +1,212 @@
+{
+ "character": "balanced",
+ "crossover_hz": 120.0,
+ "early": {
+  "note": "reflections come from the plan's space; none after 80 ms",
+  "order": 2
+ },
+ "engine": "soundstage-v3",
+ "events": [],
+ "first_downbeat_s": 1.15,
+ "genre": "pop",
+ "genre_source": "default",
+ "hrtf": "ku100",
+ "mode": "objects",
+ "motion_depth": 0.5,
+ "protected": [
+  "lead_vocal",
+  "kick",
+  "bass"
+ ],
+ "sections": [
+  {
+   "end_s": 10.0,
+   "label": "chorus",
+   "openness": 0.9,
+   "start_s": 0.0
+  }
+ ],
+ "space": "dry_stage",
+ "stage": {
+  "height": 1.0,
+  "motion": 1.0,
+  "rear": 1.0,
+  "return": 1.0,
+  "stage_width": 1.0
+ },
+ "stems": [
+  {
+   "az": 0.0,
+   "breathes": false,
+   "ch_share": {
+    "L": 0.5,
+    "M": 1.0,
+    "R": 0.5
+   },
+   "dist": 1.0,
+   "el": 7.0,
+   "events": [],
+   "feeds": [
+    {
+     "az": 0.0,
+     "ch": "M",
+     "el": 7.0
+    }
+   ],
+   "gain_db": 0.0,
+   "kind": "object",
+   "leaf": "lead_vocal",
+   "mode": "mono",
+   "name": "lead_vocal",
+   "protected": true,
+   "role": "lead_vocal",
+   "spread": 0.0,
+   "why": "Front centre, raised 7 degrees so it leaves the head, close and dry. Engineers keep the lead in front (Clearmountain: vocal first, rhythm section built around it) and Giles Martin avoids a hard-centre vocal so it sits in space."
+  },
+  {
+   "az": 0.0,
+   "breathes": false,
+   "ch_share": {
+    "L": 0.5,
+    "M": 1.0,
+    "R": 0.5
+   },
+   "dist": 1.4,
+   "el": 0.0,
+   "events": [],
+   "feeds": [
+    {
+     "az": 0.0,
+     "ch": "M",
+     "el": 0.0
+    }
+   ],
+   "gain_db": 0.0,
+   "kind": "object",
+   "leaf": "kick",
+   "mode": "mono",
+   "name": "kick",
+   "protected": true,
+   "role": "kick",
+   "spread": 0.0,
+   "why": "Front and anchored: kick, snare, bass and lead vocal stay front and centre."
+  },
+  {
+   "az": 0.0,
+   "breathes": false,
+   "ch_share": {
+    "L": 0.5,
+    "M": 1.0,
+    "R": 0.5
+   },
+   "dist": 1.2,
+   "el": 0.0,
+   "events": [],
+   "feeds": [
+    {
+     "az": 0.0,
+     "ch": "M",
+     "el": 0.0
+    }
+   ],
+   "gain_db": 0.0,
+   "kind": "object",
+   "leaf": "bass",
+   "mode": "mono",
+   "name": "bass",
+   "protected": true,
+   "role": "bass",
+   "spread": 0.0,
+   "why": "Centred and close; below the crossover the original passes through untouched."
+  },
+  {
+   "az": 78.0,
+   "breathes": true,
+   "ch_share": {
+    "L": 0.9946,
+    "M": 1.0,
+    "R": 0.0054
+   },
+   "dist": 2.0,
+   "el": 4.0,
+   "events": [],
+   "feeds": [
+    {
+     "az": 78.0,
+     "ch": "M",
+     "el": 4.0
+    }
+   ],
+   "gain_db": 0.0,
+   "kind": "object",
+   "leaf": "guitar_l",
+   "mode": "side",
+   "name": "guitar_l",
+   "protected": false,
+   "role": "guitar",
+   "spread": 0.0,
+   "why": "Double-tracked left and right parts become wide pairs at the sides; Clearmountain puts acoustic guitars mainly at the sides and power chords in front."
+  },
+  {
+   "az": -78.0,
+   "breathes": true,
+   "ch_share": {
+    "L": 0.0054,
+    "M": 1.0,
+    "R": 0.9946
+   },
+   "dist": 2.0,
+   "el": 4.0,
+   "events": [],
+   "feeds": [
+    {
+     "az": -78.0,
+     "ch": "M",
+     "el": 4.0
+    }
+   ],
+   "gain_db": 0.0,
+   "kind": "object",
+   "leaf": "guitar_r",
+   "mode": "side",
+   "name": "guitar_r",
+   "protected": false,
+   "role": "guitar",
+   "spread": 0.0,
+   "why": "Double-tracked left and right parts become wide pairs at the sides; Clearmountain puts acoustic guitars mainly at the sides and power chords in front."
+  },
+  {
+   "az": 130.0,
+   "breathes": true,
+   "ch_share": {
+    "L": 0.98,
+    "M": 1.0,
+    "R": 0.02
+   },
+   "dist": 2.6,
+   "el": 30.0,
+   "events": [],
+   "feeds": [
+    {
+     "az": 130.0,
+     "ch": "M",
+     "el": 30.0
+    }
+   ],
+   "gain_db": -1.0,
+   "kind": "object",
+   "leaf": "pad_l",
+   "mode": "side",
+   "name": "pad_l",
+   "protected": false,
+   "role": "pad",
+   "spread": 0.0,
+   "why": "Pads, strings and synths wrap around the listener, rear and height layer; strings high (Thorp)."
+  }
+ ],
+ "style": {},
+ "template": "Pop",
+ "tempo_bpm": 111.978,
+ "track_id": "example",
+ "version": 3
+}

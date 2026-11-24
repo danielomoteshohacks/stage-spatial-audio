@@ -277,10 +277,13 @@ class Cascade:
         outs, centres, _ = adress.azimuth_split(x)
         if len(centres) < 2:
             return {name: x}
-        parts = {}
+        parts: dict[str, NDArray] = {}
         for c, o in zip(centres, outs[:-1], strict=True):
             side = "left" if c < -0.3 else "right" if c > 0.3 else "centre"
-            parts[f"{name}_{side}"] = o
+            key, i = f"{name}_{side}", 2
+            while key in parts:  # two clusters on one side must not overwrite each other
+                key, i = f"{name}_{side}{i}", i + 1
+            parts[key] = o
         first = next(iter(parts))
         parts[first] = parts[first] + outs[-1]  # the diffuse remainder joins the first part
         return parts

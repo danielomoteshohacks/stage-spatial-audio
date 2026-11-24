@@ -81,15 +81,25 @@ def leaf_errors(song: ObjectSong, a: int, b: int, plan: dict, stems: dict[str, n
 
     by_stem: dict[str, list[dict]] = {}
     for obj in plan["stems"]:
-        by_stem.setdefault(str(obj.get("source", "mix.direct")).split(".")[0], []).append(obj)
+        if obj.get("kind") == "return":
+            continue
+        key = obj["leaf"] if int(plan.get("version", 2)) >= 3 else str(
+            obj.get("source", "mix.direct")).split(".")[0]
+        by_stem.setdefault(key, []).append(obj)
     out = {}
     for s in song.specs:
         ref = song.stereo[s.name][:, a:b]
         stem = best_stem_for(ref, stems)
         sq, w_sum = 0.0, 0.0
+        e_lr = np.sum(ref**2, axis=1) + 1e-20
+        share = e_lr / e_lr.sum()
+        v2 = int(plan.get("version", 2)) < 3
         for obj in by_stem.get(stem, []):
             for f in feeds_for_object(obj, plan):
-                w = f.weight * f.direct
+                # v2's feeds belong to a whole stem; weight them by where this leaf's own
+                # energy is (left or right channel). v3's feeds are already the leaf's own.
+                lw = (2.0 * share[0 if f.az >= 0 else 1]) if (v2 and abs(f.az) > 1e-6) else 1.0
+                w = f.weight * f.direct * lw
                 sq += w * angular_distance_deg(s.az, s.el, f.az, f.el) ** 2
                 w_sum += w
         out[s.name] = float(np.sqrt(sq / max(w_sum, 1e-12)))
@@ -149,6 +159,7 @@ def run_engine(engine: str, song: ObjectSong, a: int, b: int, separator: str) ->
         "sectors": {k: round(v, 4) for k, v in sec.items()},
         "object_spread": object_spread(dm),
         "map_distance_deg": round(map_distance_deg(dm, truth), 2),
+        "truth_object_spread": object_spread(truth_map(song, a, b)),
         "leaf_angular_error_deg": {k: round(v, 1) for k, v in errs.items()},
         "angular_error_rms_deg": round(float(np.sqrt(np.mean(np.square(list(errs.values()))))), 1),
         "drr_db_median": diag["drr_db_median"], "late_energy_share": diag["late_energy_share"],

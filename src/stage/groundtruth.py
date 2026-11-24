@@ -53,7 +53,7 @@ LEAVES: tuple[LeafSpec, ...] = (
     LeafSpec("keys", 35.0, 5.0, 1.9, "other", "keys"),
     LeafSpec("pad_l", 125.0, 25.0, 2.5, "other", "pad"),
     LeafSpec("pad_r", -125.0, 25.0, 2.5, "other", "pad"),
-    LeafSpec("fx", 0.0, 65.0, 2.5, "other", "fx"),
+    LeafSpec("fx", 150.0, 60.0, 2.5, "other", "fx"),
 )
 
 

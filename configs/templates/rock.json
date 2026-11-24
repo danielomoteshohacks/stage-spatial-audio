@@ -110,5 +110,15 @@
     "outro": 0.3
   },
   "genre": "rock",
-  "_about": "Genre template (decision 0017). Azimuths in degrees, positive to the LEFT (SOFA convention), elevation up, distances in metres. spread is the angle between the object's two virtual sources; wide gives the spread and elevation it opens to in open sections. motion paths: orbit (a full turn per period when depth is 360), sway (back and forth by depth degrees), scaled by the listener's motion depth and capped at 45 degrees per second. protected objects never move."
+  "_about": "Genre template (decision 0017). Azimuths in degrees, positive to the LEFT (SOFA convention), elevation up, distances in metres. spread is the angle between the object's two virtual sources; wide gives the spread and elevation it opens to in open sections. motion paths: orbit (a full turn per period when depth is 360), sway (back and forth by depth degrees), scaled by the listener's motion depth and capped at 45 degrees per second. protected objects never move.",
+  "v3": {
+    "space": "dry_stage",
+    "stage_width": 1.15,
+    "height": 0.7,
+    "rear": 0.8,
+    "return": 0.8,
+    "motion": 0.7,
+    "lead_dist": 1.0,
+    "why": "Guitars wide at the sides, the band in front of the listener, little height."
+  }
 }

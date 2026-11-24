@@ -108,5 +108,15 @@
     "outro": 0.3
   },
   "genre": "acoustic",
-  "_about": "Genre template (decision 0017). Azimuths in degrees, positive to the LEFT (SOFA convention), elevation up, distances in metres. spread is the angle between the object's two virtual sources; wide gives the spread and elevation it opens to in open sections. motion paths: orbit (a full turn per period when depth is 360), sway (back and forth by depth degrees), scaled by the listener's motion depth and capped at 45 degrees per second. protected objects never move."
+  "_about": "Genre template (decision 0017). Azimuths in degrees, positive to the LEFT (SOFA convention), elevation up, distances in metres. spread is the angle between the object's two virtual sources; wide gives the spread and elevation it opens to in open sections. motion paths: orbit (a full turn per period when depth is 360), sway (back and forth by depth degrees), scaled by the listener's motion depth and capped at 45 degrees per second. protected objects never move.",
+  "v3": {
+    "space": "dry_stage",
+    "stage_width": 0.8,
+    "height": 0.6,
+    "rear": 0.6,
+    "return": 0.9,
+    "motion": 0.4,
+    "lead_dist": 0.9,
+    "why": "Intimate: a small stage close by, the room as the record has it, almost no movement."
+  }
 }

@@ -246,9 +246,22 @@ def _load(path: str | None, sample_rate: int, n_fft: int) -> HrtfSet:
     return HrtfSet(pack, sample_rate, n_fft)
 
 
-def get_hrtf(sample_rate: int, n_fft: int = 512, prefer: str = "measured") -> HrtfSet:
-    """The measured set if its pack is available locally, else the analytic fallback."""
-    path = find_pack() if prefer == "measured" else None
+def get_hrtf(sample_rate: int, n_fft: int = 512, prefer: str = "measured",
+             head: str | None = None) -> HrtfSet:
+    """The measured set if its pack is available locally, else the analytic fallback.
+
+    `head` names a SADIE II subject (stage.spatial.heads); D1 or None is the original pack. A
+    head that is not on this machine falls back to D1, then to the analytic head: rendering
+    never fails for want of a download (the plan records which head was used).
+    """
+    path: Path | None = None
+    if prefer == "measured":
+        if head and head.upper() != "D1":
+            from stage.spatial.heads import pack_path
+
+            p = pack_path(head.upper())
+            path = p if p.is_file() else None
+        path = path or find_pack()
     return _load(str(path) if path else None, int(sample_rate), int(n_fft))
 
 

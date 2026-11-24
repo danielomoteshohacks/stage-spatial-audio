@@ -186,5 +186,37 @@
     "order": 2,
     "predelay_ms": 5.0,
     "speaker_distance_m": 7.0
+  },
+  "dry_stage": {
+    "label": "Dry stage",
+    "why": "A minimally reflective room for object rendering (decision 0025): a small, well-treated space whose only job is to give each direct sound a few short, low-level early reflections so that it is heard outside the head, as the research on non-individual HRTFs asks (Reed and Maher; Rajendran et al.). RT60 about 0.05 to 0.14 s, reflections 6 dB under the studio's fitted level, image sources to order 2 in a 7 m room so every reflection arrives within 80 ms of the direct sound. The long tail is not here on purpose: the record's own reverb, returned by dereverberation, supplies the ambience.",
+    "size_m": [
+      7.0,
+      5.2,
+      3.0
+    ],
+    "listener_m": [
+      3.0,
+      2.6,
+      1.3
+    ],
+    "rt60_s": [
+      0.14,
+      0.12,
+      0.09,
+      0.07,
+      0.06,
+      0.05,
+      0.05
+    ],
+    "absorption_bias": {
+      "walls": 1.2,
+      "floor": 0.8,
+      "ceiling": 1.5
+    },
+    "order": 2,
+    "predelay_ms": 0.0,
+    "speaker_distance_m": 1.8,
+    "reflection_level_db": -19.0
   }
 }

@@ -1,0 +1,156 @@
+{
+  "_about": "Default placement of every leaf the separation cascade can produce, by role (decision 0024). Azimuth in degrees, positive to the LEFT (SOFA), elevation up, distance in metres from the listener. mode: mono (one point source from the mid signal), pair (two sources at +/- az, driven by the left and right channels), side (one point source on the side named in the leaf, e.g. guitar_left at +az). protected objects never move. breathes: the pair opens in loud sections and closes in quiet ones. Genre files in configs/templates/*.json carry a `v3` block that scales these.",
+  "roles": {
+    "lead_vocal": {
+      "mode": "mono",
+      "az": 0,
+      "el": 7,
+      "dist": 1.0,
+      "protected": true,
+      "breathes": false,
+      "gain_db": 0,
+      "why": "Front centre, raised 7 degrees so it leaves the head, close and dry. Engineers keep the lead in front (Clearmountain: vocal first, rhythm section built around it) and Giles Martin avoids a hard-centre vocal so it sits in space."
+    },
+    "backing_vocal": {
+      "mode": "pair",
+      "az": 100,
+      "el": 12,
+      "dist": 1.9,
+      "protected": false,
+      "breathes": true,
+      "gain_db": -1,
+      "why": "Harmonies behind the sides and a little up, widening in choruses (Vintage King: backing vocals in the top rear; Thorp: backing vocals panned low and strings high)."
+    },
+    "kick": {
+      "mode": "mono",
+      "az": 0,
+      "el": 0,
+      "dist": 1.4,
+      "protected": true,
+      "breathes": false,
+      "gain_db": 0,
+      "why": "Front and anchored: kick, snare, bass and lead vocal stay front and centre."
+    },
+    "snare": {
+      "mode": "mono",
+      "az": 0,
+      "el": 0,
+      "dist": 1.5,
+      "protected": true,
+      "breathes": false,
+      "gain_db": 0,
+      "why": "As the kick."
+    },
+    "bass": {
+      "mode": "mono",
+      "az": 0,
+      "el": 0,
+      "dist": 1.2,
+      "protected": true,
+      "breathes": false,
+      "gain_db": 0,
+      "why": "Centred and close; below the crossover the original passes through untouched."
+    },
+    "cymbals": {
+      "mode": "pair",
+      "az": 30,
+      "el": 38,
+      "dist": 2.0,
+      "protected": false,
+      "breathes": false,
+      "gain_db": -1,
+      "why": "Hats and cymbals above and slightly forward, so the kit has a top."
+    },
+    "toms": {
+      "mode": "pair",
+      "az": 50,
+      "el": 8,
+      "dist": 1.8,
+      "protected": false,
+      "breathes": false,
+      "gain_db": 0,
+      "events": [
+        "fill"
+      ],
+      "why": "A wide arc, so fills sweep across the listener."
+    },
+    "guitar": {
+      "mode": "pair",
+      "az": 75,
+      "el": 4,
+      "dist": 2.0,
+      "protected": false,
+      "breathes": true,
+      "gain_db": 0,
+      "why": "Double-tracked left and right parts become wide pairs at the sides; Clearmountain puts acoustic guitars mainly at the sides and power chords in front."
+    },
+    "keys": {
+      "mode": "pair",
+      "az": 38,
+      "el": 6,
+      "dist": 1.9,
+      "protected": false,
+      "breathes": true,
+      "gain_db": 0,
+      "why": "Front-wide."
+    },
+    "pad": {
+      "mode": "pair",
+      "az": 125,
+      "el": 30,
+      "dist": 2.6,
+      "protected": false,
+      "breathes": true,
+      "gain_db": -1,
+      "events": [
+        "lift"
+      ],
+      "why": "Pads, strings and synths wrap around the listener, rear and height layer; strings high (Thorp)."
+    },
+    "fx": {
+      "mode": "mono",
+      "az": 180,
+      "el": 50,
+      "dist": 2.5,
+      "protected": false,
+      "breathes": false,
+      "gain_db": -2,
+      "events": [
+        "riser",
+        "throw"
+      ],
+      "why": "Effects, risers, delay throws and ad-libs: rear and overhead, with movement."
+    },
+    "other": {
+      "mode": "pair",
+      "az": 85,
+      "el": 10,
+      "dist": 2.1,
+      "protected": false,
+      "breathes": true,
+      "gain_db": 0,
+      "why": "Anything unclassified: wide at the sides."
+    }
+  },
+  "single_side": {
+    "backing_vocal": 100,
+    "guitar": 78,
+    "pad": 130,
+    "keys": 40,
+    "cymbals": 30,
+    "toms": 50,
+    "other": 88
+  },
+  "returns": {
+    "side": 0.3,
+    "rear": 0.3,
+    "height": 0.4,
+    "why": "The record's own reverb is returned from around and above the listener, none in front, at its original level."
+  },
+  "events": {
+    "max_deg_per_s": 90.0,
+    "max_range_deg": 100.0,
+    "ambient_max_deg_per_s": 45.0,
+    "why": "Eased paths on the beat grid with speed and range caps. Rotation at tens of degrees per second can induce illusory self-motion (Valjamae 2009); fills are short and bounded, ambient motion stays at the v2 cap of 45 degrees per second. SPECULATIVE thresholds."
+  }
+}

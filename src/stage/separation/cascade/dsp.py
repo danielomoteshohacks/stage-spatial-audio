@@ -103,6 +103,9 @@ def split_other(other: NDArray) -> tuple[dict[str, NDArray], dict[str, str]]:
     roles: dict[str, str] = {}
     for c, o in zip(used, outs[:-1], strict=True):
         name = "other_left" if c < -0.3 else "other_right" if c > 0.3 else "other_centre"
+        base, i = name, 2
+        while name in leaves:  # two clusters on one side must not overwrite each other
+            name, i = f"{base}{i}", i + 1
         leaves[name] = o
         roles[name] = "pad" if _sustain(o) > 0.9 else "pluck"
     leaves[next(iter(leaves))] = leaves[next(iter(leaves))] + outs[-1]  # remainder joins one

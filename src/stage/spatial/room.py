@@ -329,13 +329,14 @@ class Brir:
 
 def brir(space: Space, hrtf: HrtfSet, az_deg: float, el_deg: float, distance_m: float,
          reverb_scale: float = 1.0, early_scale: float = 1.0,
-         direct_extra_db: NDArray | None = None) -> Brir:
+         direct_extra_db: NDArray | None = None, late: bool = True) -> Brir:
     """The three parts of the binaural response for a source at (az, el, distance).
 
     The direct part has unit gain (distance level cues are applied by the scene, decision 0016);
     `direct_extra_db` (2, K) shapes it, for air absorption and near-field level differences.
     Early and late are scaled so their sum's energy over the direct's is (r / r_c)^2 at the
     source's actual distance, as in a diffuse room, unless the images alone already exceed it.
+    With `late=False` only the direct sound and the early reflections are built.
     """
     sr = hrtf.sample_rate
     n = response_length(space, sr)
@@ -353,6 +354,10 @@ def brir(space: Space, hrtf: HrtfSet, az_deg: float, el_deg: float, distance_m: 
     early[:, BASE_DELAY:] = er[:, : n - BASE_DELAY]
     level = 10.0 ** (space.reflection_level_db / 20.0)
     early *= early_scale * level
+    if not late:
+        # Object rendering (decision 0025): direct sound and early reflections only. The late
+        # field is the most expensive part of a response and is not wanted there.
+        return Brir(direct=direct, early=early, late=np.zeros((2, n)))
     e_direct = float(np.sum(direct**2))
     e_early = float(np.sum(early**2))
     e_reverb = e_direct * (r / space.critical_distance()) ** 2 * level**2

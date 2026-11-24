@@ -28,9 +28,10 @@ def hs():
     return get_hrtf(FS)
 
 
-def test_six_documented_spaces_with_generic_names():
+def test_seven_documented_spaces_with_generic_names():
     sp = spaces()
-    assert set(sp) == {"studio", "living_room", "car", "club", "concert_hall", "cinema"}
+    assert set(sp) == {"studio", "living_room", "car", "club", "concert_hall", "cinema",
+                       "dry_stage"}
     for s in sp.values():
         assert len(s.rt60_s) == OCTAVES.size and len(s.why) > 60
         assert all(0 < v < s.size_m[i] for i, v in enumerate(s.listener_m))

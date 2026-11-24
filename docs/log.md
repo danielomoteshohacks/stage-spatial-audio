@@ -483,3 +483,47 @@ levels: lead vocal 1.8 dB, kick 10.5, bass 10.5, snare 4.1, hi-hat 4.5, guitars 
 ### Next
 
 Phase 2: the object renderer, the dry stage and the placement engine.
+
+## 2026-11-24: v3 Phase 2, the object renderer
+
+### Done
+
+- Placement as data (decision 0024): `configs/placement/roles.json` and a `v3` block in each of
+  the ten genre templates; a "Dry stage" space; `stage.scene3` (plan, events, renderer) and
+  `schemas/plan3.schema.json` (decisions 0024 and 0025).
+- Event-driven motion (risers, tom fills, delay throws) on the beat grid, with speed and range
+  caps that scale amplitude and never timing; breathing by section openness.
+- The record's own reverb returned from the sides, rear and above at its original level.
+- Several measured heads (`stage.spatial.heads`, the `hrtf-heads` workflow, decision 0026) and
+  head selection from calibration answers; the web game follows in Phase 5.
+
+### Measured
+
+Table in decision 0025 (two ground-truth songs, true leaves into v3, true four stems into v2):
+direct energy outside the front +/-30 degrees 43% against 14% (3.0 times; the truth has 31%),
+height layer 9% against 0.2%, median object DRR +26 dB against -6.1 dB, late energy 0% against
+6.6%, IACC 0.53 against 0.72, direction-map distance to the truth 12.5 degrees against 24.5,
+per-leaf angular error 16.4 degrees against 51, timbre deviation 0.8 dB against 1.7, guard pass on
+both. 14 renderer tests (planner rules, events and caps, directional bound, the sum of the object
+stems and the low band, direction of the guitar pair, v3 more than twice as wide as v2).
+
+### What went wrong
+
+- The first angular-error number for v3 read 0.0 degrees: the metric looked objects up by the v2
+  `source` field and found none. v3 objects are looked up by leaf.
+- The first v3 error (35 degrees) weighted both feeds of a pair equally, although a source panned
+  hard left is almost entirely in the left feed. The weights now follow each leaf's channel
+  energy, for v2 as well (v2's error fell from 72 to 51 degrees under the fairer metric; the 72
+  quoted in Phase 0 used equal weights and is superseded).
+- The renderer's first render in a process takes 20 s per 30 s: the early-reflection response of
+  each position is built once and cached. Steady state is 1.1 s per 10 s. Phase 3 addresses it.
+- The angular-error target cannot be independent of the placement convention: the ground-truth
+  songs are placed by the same published practice as the rules. Said in decisions 0024 and 0027.
+- The 3x gate is met on average (3.0) but not on every song (2.9 on one); I did not push the
+  stage wider to meet it, because v3 is already wider than the truth.
+- The workflow actions for artifacts are referenced by major tag, not by commit hash like the
+  others, because the hashes could not be checked from the cloud session.
+
+### Next
+
+Phase 3: whole songs, chunked and streamed, Opus delivery, and the real-time factor table.

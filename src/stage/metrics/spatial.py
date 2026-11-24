@@ -287,7 +287,7 @@ def v2_feeds(obj: dict[str, Any], plan: dict[str, Any]) -> list[Feed]:
 def v3_feeds(obj: dict[str, Any], plan: dict[str, Any]) -> list[Feed]:
     """v3 plans list each object's feeds; the room part comes from the plan's `drr_db`."""
     out = []
-    for f in obj["feeds"]:
+    for f in obj.get("energy_feeds") or obj["feeds"]:
         out.append(Feed(float(f["az"]), float(f["el"]), float(f["weight"]),
                         float(f.get("direct", 1.0)), float(f.get("early", 0.0))))
     return out
