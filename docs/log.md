@@ -147,3 +147,40 @@ cd web && npm ci && npm run dev                # terminal 2, then open http://lo
 `runs/stems-1/run.json` holds the stage timings, the device used, and the residual SNR. If the
 separate stage shows `failed`, the error text there says why, and the run will have fallen back to
 Lite.
+
+## 2026-11-24: v2 Phase 0, housekeeping (guard, inputs, auto start)
+
+### Done
+
+- PR #9 rescued: `stage.guard.checks`, its tests, `scripts/measure_sector_sum.py` and its
+  decision (renumbered 0010) are on main; `render_clip.py --guard` prints the table. The guard's
+  exports merge `checks` with main's `levels`.
+- `report.json` for every render (decision 0011): BS.1770-4 integrated loudness, 4x true peak,
+  per-band downmix difference, mono-sum cancellation, low-end identity, artifact flags (clipping,
+  dropouts, pre-echo, musical noise) with timestamps, and a verdict with plain reasons. A new
+  pipeline stage `guard`; thresholds with reasons in `configs/thresholds/guard.json`, bundled into
+  the Space by `space/bundle.sh`.
+- Gradio form: Start and Length are single text boxes; empty means the default, and
+  `stage.service` refuses a 0 or non-numeric length whatever the client sends.
+- `start="auto"` by default in the service, pipeline, CLI, Gradio form and web app; run.json
+  records the start, `start_mode` and the window's loudness.
+
+### Measured
+
+- Loudness against pyloudnorm 0.1.1: identical to its De Man filters; within 0.05 LU of its
+  default filters at 44.1, 48 and 96 kHz (test requires 0.1 LU). 997 Hz full-scale sine in one
+  channel: -3.01 LUFS.
+- v1 `max` on the generated kick, hats and chord signal: verdict review, timbre 3.6 dB at
+  3.15 kHz, 18 pre-echo flags (one per hat), musical noise throughout. Guard time 1.4 s per 10 s.
+- Tests: 393 passed, 1 skipped, 9 xfailed.
+
+### What went wrong
+
+- The first K-weighting design used the RBJ cookbook shelf; it missed the standard's 48 kHz
+  table by 0.05 in b0. De Man's shelf form (separate mid-band gain) matches it to 1e-12.
+- The first pre-echo test smeared transients with a one-sided decay too weak to be audible; the
+  detector correctly ignored it. The test now uses a centred 15 ms smear, the way a long frame does.
+
+### Next
+
+Phase 1: measured HRTFs (SADIE II KU100), interpolation, binaural rooms, neutrality.
