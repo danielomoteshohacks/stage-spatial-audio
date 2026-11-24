@@ -384,3 +384,45 @@ matched exactly, every v2 render passes the guard; render 8.8 s against 1.8 s.
 
 The owner runs the Kaggle notebook (the separator), the blind test with listeners, and a check on
 the Galaxy S21 FE.
+
+
+# v3
+
+## 2026-11-24: v3 Phase 0, diagnosing v2
+
+### Done
+
+- `stage.metrics.spatial`: direction-energy map by sector, object spread, direct-to-reverberant
+  ratio per object, late-energy share, IACC; `scripts/spatial_diagnose.py` (any run folder, or
+  `--bench-v2` for the suspect ablations).
+- `stage.groundtruth`: fifteen-leaf object songs with known 3D positions, a truth binaural
+  render and a stereo fold; `scripts/benchmark_groundtruth.py` scores an engine on it against
+  the truth (decision 0022).
+
+### Measured (v2, three benchmark songs, 30 s each, means)
+
+| Variant | front | side | rear | height | outside front | spread | median DRR dB | room share | late share | IACC |
+|---|---|---|---|---|---|---|---|---|---|---|
+| v2 default (living room) | 83.0% | 17.0% | 0.0% | 0.0% | 17.0% | 3.0 | -6.1 | 62.2% | 6.4% | 0.829 |
+| studio | 78.5% | 21.5% | 0.0% | 0.0% | 21.5% | 3.0 | 17.1 | 1.0% | 0.1% | 0.973 |
+| no room send | 87.6% | 12.4% | 0.0% | 0.0% | 12.4% | 3.0 | -4.8 | 57.3% | 0.0% | 0.935 |
+| no bed front share | 83.0% | 17.0% | 0.0% | 0.0% | 17.0% | 3.0 | -6.1 | 62.2% | 6.4% | 0.829 |
+| no ambient bed (all direct) | 83.0% | 17.0% | 0.0% | 0.0% | 17.0% | 3.0 | -6.1 | 62.2% | 6.4% | 0.829 |
+
+Ground-truth songs (true four stems into v2, 30 s): v2 puts 13 to 15% of the direct energy outside
+the front and 0.2% in the height layer, against 31% and 10% in the truth; the map is 24 degrees
+from the truth and the per-leaf angular error is 72 degrees RMS. Verdicts on each suspect are in
+decision 0022: v2 was a front stage of three directions, with its externalisation bought from a
+room that carries 62% of the energy.
+
+### What went wrong
+
+- The first reading of "room send off" looked like it should remove the room; it removed only the
+  late field, because `room_send` scales the late part and not the early reflections (57% of the
+  energy stays). The send is a late-tail knob only; v3 has its own early-reflection control.
+- The brief's 3x outside-front gate is above the ground truth's own share for these songs; see
+  decision 0022 for how it will be reported.
+
+### Next
+
+Phase 1: the separation cascade.
