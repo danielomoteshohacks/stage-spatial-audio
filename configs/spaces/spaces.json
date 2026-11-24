@@ -1,0 +1,190 @@
+{
+  "_about": "Listening spaces for the binaural room renderer (stage.spatial.room, decision 0013). Dimensions in metres (length along the listener's look direction, width, height), the listener's position from the rear-left floor corner, and a target RT60 per octave band (125 Hz to 8 kHz). Wall absorption is derived from the target with Eyring's formula, so the early reflections and the late field describe the same room; 'absorption_bias' shifts it between walls, floor and ceiling (1 = average). Names are generic on purpose.",
+  "studio": {
+    "label": "Studio",
+    "why": "A treated control room, modelled on the measured SADIE II studio BRIRs (University of York, KU100 at the listening position): RT60 about 0.1 s in the mids and 0.2 s in the bass, direct-to-reverberant ratio about 11 dB for a frontal loudspeaker. That is drier than ITU-R BS.1116-3's 0.25 (V/100 m3)^(1/3) s upper guide, as rooms built for critical listening usually are. The reflected level is fitted to the measured front DRR (decision 0013).",
+    "size_m": [
+      6.5,
+      5.0,
+      2.8
+    ],
+    "listener_m": [
+      2.6,
+      2.5,
+      1.2
+    ],
+    "rt60_s": [
+      0.21,
+      0.22,
+      0.15,
+      0.12,
+      0.1,
+      0.09,
+      0.09
+    ],
+    "absorption_bias": {
+      "walls": 1.0,
+      "floor": 0.6,
+      "ceiling": 1.5
+    },
+    "order": 3,
+    "predelay_ms": 0.0,
+    "speaker_distance_m": 1.8,
+    "reflection_level_db": -12.7
+  },
+  "living_room": {
+    "label": "Living room",
+    "why": "A furnished domestic room. Measured furnished living rooms sit around 0.4 to 0.6 s at mid frequencies, longer in the bass where furniture absorbs little (Diaz and Pedrero 2005, Applied Acoustics 66).",
+    "size_m": [
+      5.5,
+      4.2,
+      2.6
+    ],
+    "listener_m": [
+      3.4,
+      2.1,
+      1.1
+    ],
+    "rt60_s": [
+      0.65,
+      0.58,
+      0.5,
+      0.45,
+      0.42,
+      0.38,
+      0.32
+    ],
+    "absorption_bias": {
+      "walls": 1.0,
+      "floor": 1.3,
+      "ceiling": 0.7
+    },
+    "order": 3,
+    "predelay_ms": 0.0,
+    "speaker_distance_m": 2.2
+  },
+  "car": {
+    "label": "Car",
+    "why": "A car cabin is tiny and full of soft seats and glass: reverberation times of about 0.05 to 0.1 s, with strong very early reflections from the windscreen and side glass. The listener sits on the centre line: in the driver's seat the right-hand virtual loudspeaker would be 15 cm from the door, and that near-equal reflection combs the treble by more than the timbre matcher may correct (decision 0013).",
+    "size_m": [
+      2.4,
+      1.45,
+      1.15
+    ],
+    "listener_m": [
+      1.1,
+      0.725,
+      0.75
+    ],
+    "rt60_s": [
+      0.12,
+      0.1,
+      0.08,
+      0.07,
+      0.07,
+      0.06,
+      0.05
+    ],
+    "absorption_bias": {
+      "walls": 0.8,
+      "floor": 1.6,
+      "ceiling": 1.2
+    },
+    "order": 2,
+    "predelay_ms": 0.0,
+    "speaker_distance_m": 0.8
+  },
+  "club": {
+    "label": "Club",
+    "why": "A mid-sized club room treated for amplified music: around 0.8 to 1 s mid-band, with a longer low end that the bass crossover keeps out of the render.",
+    "size_m": [
+      22.0,
+      15.0,
+      6.0
+    ],
+    "listener_m": [
+      9.0,
+      7.5,
+      1.7
+    ],
+    "rt60_s": [
+      1.3,
+      1.1,
+      0.95,
+      0.9,
+      0.85,
+      0.75,
+      0.6
+    ],
+    "absorption_bias": {
+      "walls": 1.0,
+      "floor": 0.5,
+      "ceiling": 1.4
+    },
+    "order": 2,
+    "predelay_ms": 8.0,
+    "speaker_distance_m": 6.0
+  },
+  "concert_hall": {
+    "label": "Concert hall",
+    "why": "A large shoebox hall. Beranek (Concert Halls and Opera Houses, 2004) reports about 1.8 to 2.1 s occupied mid-frequency reverberation in the best-rated halls, with a bass ratio above 1.1 and a high-frequency roll-off from air absorption.",
+    "size_m": [
+      42.0,
+      26.0,
+      17.0
+    ],
+    "listener_m": [
+      26.0,
+      13.0,
+      1.4
+    ],
+    "rt60_s": [
+      2.4,
+      2.2,
+      2.0,
+      1.95,
+      1.8,
+      1.5,
+      1.1
+    ],
+    "absorption_bias": {
+      "walls": 0.8,
+      "floor": 1.5,
+      "ceiling": 0.8
+    },
+    "order": 2,
+    "predelay_ms": 20.0,
+    "speaker_distance_m": 14.0
+  },
+  "cinema": {
+    "label": "Cinema",
+    "why": "A mid-sized auditorium. Cinema guidelines aim for a short, even decay so dialogue stays clear in a large volume: about 0.5 to 0.7 s mid-band for 2000 to 3000 m3, rising slightly in the bass.",
+    "size_m": [
+      24.0,
+      16.0,
+      8.0
+    ],
+    "listener_m": [
+      14.0,
+      8.0,
+      1.2
+    ],
+    "rt60_s": [
+      0.85,
+      0.75,
+      0.65,
+      0.6,
+      0.58,
+      0.55,
+      0.48
+    ],
+    "absorption_bias": {
+      "walls": 1.1,
+      "floor": 1.2,
+      "ceiling": 0.8
+    },
+    "order": 2,
+    "predelay_ms": 5.0,
+    "speaker_distance_m": 7.0
+  }
+}

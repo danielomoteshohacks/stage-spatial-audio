@@ -28,10 +28,11 @@ from numpy.typing import NDArray
 
 from stage import __version__
 from stage.analysis.excerpt import auto_start
-from stage.guard.levels import match_rms, peak_gain, rms
+from stage.engines import DEFAULT_PROFILE, check_profile, is_v2
+from stage.engines import render as render_engine
+from stage.guard.levels import peak_gain, rms
 from stage.guard.report import build_report
 from stage.io import read_audio, to_stereo
-from stage.render.profiles import PROFILES, render_profile
 from stage.render.sectors import WIDEN_BETA_MAX, WIDEN_BETA_MIN
 from stage.separation.demucs_sep import STEM_NAMES, Separation, separate
 
@@ -144,7 +145,7 @@ def run(
     path: str | Path,
     *,
     mode: str = "lite",
-    profile: str = "max",
+    profile: str = DEFAULT_PROFILE,
     beta: float = 2.0,
     start: float | str | None = "auto",
     seconds: float | None = None,
@@ -157,7 +158,7 @@ def run(
     Args:
         path: an audio file soundfile can read.
         mode: "lite" renders the whole mix; "stems" separates first and renders each stem.
-        profile: a name in `stage.render.profiles.PROFILES`.
+        profile: a name from `stage.engines.profile_names()` ("space:<name>" for v2).
         beta: widen strength, 1.0 to 2.4.
         start: seconds into the file, None for the beginning, or "auto" for the loudest window
             of length `seconds` (the chorus or drop, see stage.analysis.excerpt).
@@ -168,8 +169,7 @@ def run(
     """
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
-    if profile not in PROFILES:
-        raise ValueError(f"unknown profile {profile!r}; known: {sorted(PROFILES)}")
+    check_profile(profile)
     if not WIDEN_BETA_MIN <= beta <= WIDEN_BETA_MAX:
         raise ValueError(f"beta must be in [{WIDEN_BETA_MIN}, {WIDEN_BETA_MAX}], got {beta}")
     out = Path(out_dir)
@@ -206,6 +206,7 @@ def run(
         "separation": None,
         "levels": None,
         "guard": None,
+        "engine": None,
     }
     outputs: dict[str, Any] = {}
 
@@ -254,13 +255,16 @@ def run(
     else:
         def _render() -> NDArray[np.float64]:
             if sep is None:
-                return render_profile(audio, sr, profile, beta)
+                y, info = render_engine(audio, sr, profile, beta)
+                report["engine"] = info
+                return y
             # One stem at a time: the renderer's working arrays (STFT, analysis, sector
             # outputs) dominate memory, so rendering in sequence and keeping only the
             # finished (2, n) outputs keeps the peak near that of a single Lite render.
             total = np.zeros_like(audio)
             for name in STEM_NAMES:
-                y = render_profile(sep.stems[name], sr, profile, beta)
+                y, info = render_engine(sep.stems[name], sr, profile, beta)
+                report["engine"] = info
                 total += y
                 spatial_stems[name] = y
             return total
@@ -276,8 +280,14 @@ def run(
         def _levels() -> NDArray[np.float64]:
             target = rms(audio)
             raw = rms(spatial)
-            matched = match_rms(spatial, target)
-            scale = 1.0 if raw == 0.0 else target / raw
+            if is_v2(profile):
+                # v2 is loudness-matched inside the renderer with the bass passed through, so
+                # an RMS match here would move the record's bass with the rest; only the peak
+                # safety applies.
+                scale = 1.0
+            else:
+                scale = 1.0 if raw == 0.0 else target / raw
+            matched = spatial * scale
             # One shared gain for the full render and every stem, so soloing and muting stems
             # in the player sums back to exactly spatial.flac; it also keeps each stem file
             # below the ceiling on its own.

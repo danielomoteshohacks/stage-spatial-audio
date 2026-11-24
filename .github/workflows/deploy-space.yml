@@ -61,3 +61,49 @@ jobs:
           )
           print(f"uploaded: {info}")
           PY
+      # The deploy is only done when the Space has rebuilt and answers like the backend the web
+      # app expects: running, with a /process endpoint that lists the default v2 profile.
+      - name: Wait for the Space and check its API
+        if: steps.config.outputs.enabled == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          python - <<'PY'
+          import json, os, time, urllib.request
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo = os.environ["HF_SPACE"]
+          deadline = time.time() + 20 * 60
+          stage = None
+          while time.time() < deadline:
+              stage = api.get_space_runtime(repo).stage
+              print("space stage:", stage, flush=True)
+              if stage == "RUNNING":
+                  break
+              if stage in ("BUILD_ERROR", "RUNTIME_ERROR", "CONFIG_ERROR"):
+                  raise SystemExit(f"the Space failed to start: {stage}")
+              time.sleep(20)
+          else:
+              raise SystemExit(f"the Space did not reach RUNNING in 20 minutes (last: {stage})")
+          host = getattr(api.space_info(repo), "host", None) or (
+              "https://" + repo.replace("/", "-").replace("_", "-").replace(".", "-").lower()
+              + ".hf.space")
+          for attempt in range(10):
+              try:
+                  req = urllib.request.Request(f"{host}/gradio_api/info",
+                                               headers={"Authorization": f"Bearer {os.environ['HF_TOKEN']}"})
+                  info = json.load(urllib.request.urlopen(req, timeout=60))
+                  break
+              except Exception as exc:
+                  print("info not ready:", exc, flush=True)
+                  time.sleep(15)
+          else:
+              raise SystemExit("the Space is running but /gradio_api/info does not answer")
+          params = info["named_endpoints"]["/process"]["parameters"]
+          profiles = next(p for p in params if p["parameter_name"] == "profile")["type"]["enum"]
+          print("profiles:", profiles)
+          assert "space:studio" in profiles, profiles
+          print(f"{host} is live with the v2 engine")
+          PY

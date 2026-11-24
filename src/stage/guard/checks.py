@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.signal import correlate, correlation_lags, welch
+from scipy.signal import welch
 
 #: Alignment passes when |lag| is below this.
 ALIGNMENT_MAX_MS = 1.0
@@ -76,6 +76,25 @@ class AlignmentResult:
     passed: bool
 
 
+def _onset_function(x: NDArray, sample_rate: float, hop: int) -> NDArray[np.float64]:
+    """Rise of the smoothed high-band (above 1 kHz) amplitude envelope, per hop.
+
+    The amplitude envelope is averaged over 4 ms, so the noise of single short frames does not
+    make false onsets; only its increases count, so reverberation (which only decays) adds
+    nothing and each transient marks the time it starts.
+    """
+    from scipy.ndimage import uniform_filter1d
+    from scipy.signal import butter, sosfiltfilt
+
+    sos = butter(4, min(1000.0, 0.4 * sample_rate), btype="highpass", fs=sample_rate,
+                 output="sos")
+    y = np.abs(sosfiltfilt(sos, x))
+    n = y.size // hop
+    env = y[: n * hop].reshape(n, hop).mean(axis=1)
+    env = uniform_filter1d(env, size=max(1, int(round(0.004 * sample_rate / hop))))
+    return np.maximum(np.diff(env, prepend=env[:1]), 0.0)
+
+
 def check_alignment(
     original: NDArray, rendered: NDArray, sample_rate: float,
     search_ms: float = ALIGNMENT_SEARCH_MS,
@@ -83,26 +102,60 @@ def check_alignment(
     """Lag between the original mid (L + R) / 2 and the rendered sum (L + R) / 2.
 
     The mid and the sum are compared because a binaural render moves energy between the ears
-    (head shadow, ear delays) but keeps the sum close to the original's mid; per-channel lags
-    would measure the intended inter-ear delay, not a misalignment.
+    (head shadow, ear delays) but keeps the sum close to the original's mid.
+
+    Two steps. First the onset functions of both (the rise of high-band energy, 0.5 ms hops)
+    are cross-correlated: transients mark time even in a reverberant render, where a waveform
+    cross-correlation is dominated by reverberation and by the periodic, sign-alternating side
+    peaks of bass notes and sustained chords. Then the waveforms are cross-correlated within
+    +/-1 ms of that lag for sample precision. Material without transients falls back to the
+    waveform correlation over the whole range. The reported correlation is the normalised
+    correlation at the lag, so an inverted render still shows a negative value.
     """
     original, rendered = _check_pair(original, rendered)
     mid = original.mean(axis=0)
     rsum = rendered.mean(axis=0)
     norm = np.sqrt(np.sum(mid**2) * np.sum(rsum**2))
     if norm == 0.0:
-        # No lag can be estimated against silence; argmax of an all-zero correlation would
-        # report the edge of the search range. A silent render is caught by the loudness check.
+        # No lag can be estimated against silence. A silent render is caught by the loudness check.
         return AlignmentResult(0, 0.0, 0.0, True)
-    xc = correlate(rsum, mid, mode="full", method="fft")
-    lags = correlation_lags(rsum.size, mid.size, mode="full")
+    nfft = 1 << int(np.ceil(np.log2(mid.size + rsum.size)))
+    cross = np.fft.rfft(rsum, nfft) * np.conj(np.fft.rfft(mid, nfft))
+    plain = np.fft.irfft(cross, nfft)
+    # The fine search uses 1 to 8 kHz only: below that, the periods of notes are long enough
+    # to put a correlation peak anywhere within the +/-1 ms window.
+    freqs = np.fft.rfftfreq(nfft, d=1.0 / sample_rate)
+    banded = np.fft.irfft(cross * ((freqs >= 1000.0) & (freqs <= 8000.0)), nfft)
     max_lag = int(round(search_ms * 1e-3 * sample_rate))
-    inside = np.abs(lags) <= max_lag
-    # Largest magnitude, not largest value: an inverted render must still be found at its true
-    # lag, and the negative peak correlation then reports the inversion.
-    best = int(np.argmax(np.abs(xc[inside])))
-    lag = int(lags[inside][best])
-    peak = float(xc[inside][best] / norm)
+
+    def best_in(lo: int, hi: int, values: NDArray, earliest: bool = False) -> int:
+        lags = np.arange(lo, hi + 1)
+        mag = np.abs(values[lags % nfft])
+        if earliest:
+            # The direct sound arrives before its reflections: take the first peak within 6 dB
+            # of the largest, not a reflection that the room happened to make stronger.
+            peaks = np.zeros(mag.size, dtype=bool)
+            peaks[1:-1] = (mag[1:-1] >= mag[:-2]) & (mag[1:-1] >= mag[2:])
+            peaks[int(np.argmax(mag))] = True
+            return int(lags[int(np.argmax(peaks & (mag >= 0.5 * mag.max())))])
+        return int(lags[int(np.argmax(mag))])
+
+    hop = max(1, int(round(0.0005 * sample_rate)))
+    oo = _onset_function(mid, sample_rate, hop)
+    orr = _onset_function(rsum, sample_rate, hop)
+    lag = None
+    if oo.size > 8 and oo.max() > 1e-9:
+        m = 1 << int(np.ceil(np.log2(2 * oo.size)))
+        xc = np.fft.irfft(np.fft.rfft(orr, m) * np.conj(np.fft.rfft(oo, m)), m)
+        k = max_lag // hop
+        cand = np.concatenate([np.arange(0, k + 1), np.arange(-k, 0)])
+        coarse = int(cand[int(np.argmax(xc[cand % m]))]) * hop
+        refine = int(round(0.001 * sample_rate)) + hop
+        lag = best_in(max(-max_lag, coarse - refine), min(max_lag, coarse + refine), banded,
+                      earliest=True)
+    if lag is None:
+        lag = best_in(-max_lag, max_lag, plain)
+    peak = float(plain[lag % nfft] / norm)
     lag_ms = 1e3 * lag / sample_rate
     return AlignmentResult(lag, lag_ms, peak, abs(lag_ms) < ALIGNMENT_MAX_MS)
 

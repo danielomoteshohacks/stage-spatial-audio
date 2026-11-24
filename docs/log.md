@@ -184,3 +184,53 @@ Lite.
 ### Next
 
 Phase 1: measured HRTFs (SADIE II KU100), interpolation, binaural rooms, neutrality.
+
+## 2026-11-24: v2 Phase 1, real ears and real rooms
+
+### Done
+
+- **Measured HRTFs** (decision 0012): `tools/hrtf-pack` and the `hrtf-pack` workflow build a
+  1.87 MB pack from SADIE II subject D1 (KU100) on a GitHub runner and publish it as release
+  `hrtf-pack-v1`, with the measured studio BRIRs as a second asset. Licence Apache-2.0, checked
+  in the Zenodo record and in the SOFA file. The Space downloads and verifies it at start-up;
+  the analytic head remains the offline fallback.
+- **Interpolation**: barycentric over the spherical Delaunay triangulation, minimum-phase
+  magnitudes and ITD separately; ring-measured grid resampled onto 4000 uniform directions.
+- **Rooms** (0013): six spaces with image sources (order 2 or 3) through the measured head, ISO
+  9613-1 air absorption, Eyring-consistent wall absorption, a multiband FDN late field mixed to
+  the KU100's measured diffuse coherence, fitted to the measured York studio BRIRs.
+- **Neutrality** (0014): zero-phase Linkwitz-Riley bass bypass at 120 Hz, diffuse-field EQ,
+  1/3-octave minimum-phase timbre matcher on both ears, upper-band BS.1770 loudness match.
+- `space:<name>` profiles; `space:studio` is the default in the pipeline, service, Space and web.
+- The deploy workflow now waits for the Space to run and checks its API lists `space:studio`.
+
+### Measured
+
+- Continuity: 0.47 dB per degree worst case along azimuth (target 0.5); 1.59 along elevation,
+  left as is because it is the pinna's elevation cue.
+- Studio against the measured SADIE II BRIRs: DRR within 1 dB except behind the head (4.5 dB too
+  dry), IACC_E within 0.12. Every space's RT60 within 15 percent plus 30 ms of target where the
+  octave filter can resolve it (table in 0013).
+- Generated 30 s track, guard: v1 `max` review with 38 artifact flags; v2 studio, club, concert
+  hall and cinema pass, living room and car review, no artifact flags in any v2 space; bass
+  correlation 0.9997 to 1.0000; alignment 0.02 ms.
+- Render time, 30 s at 44.1 kHz on the 4 vCPU build machine: v2 1.9 to 2.8 s per space (v1 `max`
+  2.4 s). The first render in a process also builds the BRIRs (0.05 to 0.8 s per space).
+- Tests: 427 passed, 1 skipped, 9 xfailed.
+
+### What went wrong and how it was fixed
+
+- The fetch tools of this session cannot reach York, Zenodo or Hugging Face; the pack is built
+  on GitHub Actions and read back here from the release.
+- The KU100 grid's near-duplicate points made interpolation jump 37 dB per degree; resampling by
+  kernel regression fixed it.
+- The guard's alignment check locked onto bass half-periods on reverberant renders and its
+  pre-echo detector counted reverb tails; both were rewritten (0014).
+- RMS levelling dragged the untouched bass down by 7 to 17 dB; levelling now scales only the
+  upper band, by loudness.
+- FDN start-up gap, per-band power imbalance, frequency-domain wrap-around and a door-side
+  loudspeaker in the car were each found by a failing RT60 or coherence test and fixed (0013).
+
+### Next
+
+Phase 2A: the SoundStage Separator (research note first).

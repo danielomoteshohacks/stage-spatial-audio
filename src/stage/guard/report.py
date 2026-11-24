@@ -65,7 +65,7 @@ def mono_gain_db(x: NDArray) -> float:
 
 
 def low_end(original: NDArray, render: NDArray, sample_rate: int, lag: int) -> dict[str, float]:
-    """Identity of the bass: correlation of the two low ends (mono, < 120 Hz) at the measured lag.
+    """Identity of the bass: correlation of the two low ends (mono, < 120 Hz) near zero lag.
 
     Also the level change there and the render's L/R correlation, which should stay near the
     original's: a decorrelated bass smears the kick and loses power in a mono fold.
@@ -73,12 +73,18 @@ def low_end(original: NDArray, render: NDArray, sample_rate: int, lag: int) -> d
     lo_o = _lowpass_fft(original, sample_rate, LOW_END_HZ)
     lo_r = _lowpass_fft(render, sample_rate, LOW_END_HZ)
     mo, mr = lo_o.sum(axis=0), lo_r.sum(axis=0)
-    if lag > 0:
-        mr, mo = mr[lag:], mo[: mo.size - lag]
-    elif lag < 0:
-        mo, mr = mo[-lag:], mr[: mr.size + lag]
+    # The best correlation within the measured lag (or 1 ms, whichever is larger) either way:
+    # a renderer may delay its upper band slightly while passing the bass straight through, and
+    # the bass's identity must not be judged at the upper band's lag.
+    reach = max(abs(lag), int(round(0.001 * sample_rate)))
     den = math.sqrt(float(np.sum(mo**2)) * float(np.sum(mr**2)))
-    corr = float(np.sum(mo * mr) / den) if den > 0 else 1.0
+    if den > 0:
+        nfft = 1 << int(np.ceil(np.log2(2 * mo.size)))
+        xc = np.fft.irfft(np.fft.rfft(mr, nfft) * np.conj(np.fft.rfft(mo, nfft)), nfft)
+        lags = np.arange(-reach, reach + 1)
+        corr = float(np.max(xc[lags % nfft]) / den)
+    else:
+        corr = 1.0
 
     def lr(x: NDArray) -> float:
         d = math.sqrt(float(np.sum(x[0] ** 2)) * float(np.sum(x[1] ** 2)))

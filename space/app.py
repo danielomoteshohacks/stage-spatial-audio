@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -28,8 +29,8 @@ for _candidate in (HERE, HERE.parent / "src"):
 import gradio as gr  # noqa: E402
 
 from stage import __version__  # noqa: E402
+from stage.engines import DEFAULT_PROFILE, profile_names  # noqa: E402
 from stage.pipeline import MODES, STAGES  # noqa: E402
-from stage.render.profiles import PROFILES  # noqa: E402
 from stage.render.sectors import WIDEN_BETA_MAX, WIDEN_BETA_MIN  # noqa: E402
 from stage.separation.demucs_sep import Separation, separate  # noqa: E402
 from stage.service import (  # noqa: E402
@@ -85,7 +86,7 @@ def process(audio_file, mode, profile, beta, start, seconds):
     # Start and length arrive as text (or numbers from older clients); empty means the default
     # and the service validates both, so a bad value comes back as a message, not a crash.
     options = ServiceOptions(
-        mode=mode or "lite", profile=profile or "max",
+        mode=mode or "lite", profile=profile or DEFAULT_PROFILE,
         beta=float(beta) if beta is not None else 2.0,
         start=start, seconds=seconds,
     )
@@ -124,7 +125,9 @@ def build() -> gr.Blocks:
                 audio = gr.File(label="Track", file_types=list(ALLOWED_EXTENSIONS),
                                 type="filepath")
                 mode = gr.Radio(list(MODES), value="lite", label="Mode")
-                profile = gr.Dropdown(sorted(PROFILES), value="max", label="Profile")
+                profile = gr.Dropdown(profile_names(), value=DEFAULT_PROFILE, label="Profile",
+                                      info="space:<name> is the v2 engine; max and V0 to V5b "
+                                           "are v1, kept for comparison.")
                 beta = gr.Slider(WIDEN_BETA_MIN, WIDEN_BETA_MAX, value=2.0, step=0.05,
                                  label="Width (beta)")
                 # Text boxes, not gr.Number: a Number shows 0 when it is empty, which reads as a
@@ -152,8 +155,26 @@ def build() -> gr.Blocks:
 
 demo = build()
 
+def fetch_assets() -> None:
+    """Download the measured HRTF pack once, on Hugging Face's servers, in the background.
+
+    Until it arrives (or if the download fails) renders use the analytic head model, and run.json
+    names the head that was used, so a render is never mislabelled.
+    """
+    from stage.spatial.hrtf import download_pack
+
+    def work() -> None:
+        try:
+            print(f"HRTF pack ready: {download_pack()}", flush=True)
+        except Exception as exc:  # the analytic fallback keeps the Space working
+            print(f"HRTF pack unavailable, using the analytic head: {exc}", flush=True)
+
+    threading.Thread(target=work, name="soundstage-assets", daemon=True).start()
+
+
 if __name__ == "__main__":
     WORK_ROOT.mkdir(parents=True, exist_ok=True)
     start_sweeper()
+    fetch_assets()
     demo.launch(server_port=int(os.getenv("GRADIO_SERVER_PORT", "7860")),
                 allowed_paths=[str(WORK_ROOT)], show_error=True)

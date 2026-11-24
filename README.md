@@ -118,9 +118,14 @@ and the web app to Cloudflare Pages ([`web/README.md`](web/README.md)).
 Early development. Nothing here yet makes a perceptual claim: the profiles carry objective proxy
 measurements only (decision 0007), and the blind tests have not been run.
 
-- The listening bench works end to end in Lite mode on a laptop (measured in
-  [`docs/log.md`](docs/log.md)). Real Demucs separation and the ZeroGPU Space have not been run
-  yet; the code for both is written against their documented APIs.
+- **v2 engine, Phase 1 (decisions 0012 to 0014):** measured KU100 ears from SADIE II,
+  interpolated over the sphere without combing; six binaural spaces with image-source
+  reflections and a multiband late field; the bass below 120 Hz passed through untouched; a
+  timbre and loudness matcher. Every render gets a fidelity report (decision 0011). On the
+  generated test track v2 has no artifact flags where v1 had 38, and four of six spaces pass the
+  guard (two are "review"). These are objective measurements, not a listening result.
+- The listening bench works end to end on a laptop and on the Space (measured in
+  [`docs/log.md`](docs/log.md)).
 
 - [ ] **Slice 1, Hear it:** one clip spatialised by Lite in Python
 - [ ] **Slice 2, Prove it:** measurements and a first blind test
@@ -191,7 +196,14 @@ SoundStage builds on established research and says so: panning-index and ambienc
 (Avendano and Jot), azimuth discrimination and resynthesis (Barry and colleagues), primary-ambient
 extraction (He, Tan and Gan, and others), stereo position estimation (Kraft and Zolzer), source
 separation models (Demucs, SCNet, RoFormer families), and open head-related transfer function
-datasets (used with attribution). Some structures used in commercial binaural virtualisers are
+datasets (used with attribution).
+
+**Credits.** The default head-related filters are built from the SADIE II Database, subject D1
+(Neumann KU100), The Audio Lab, University of York: C. Armstrong, L. Thresh, D. Murphy and
+G. Kearney, "A Perceptual Evaluation of Individual and Non-Individual HRTFs: A Case Study of the
+SADIE II Database", Applied Sciences 8(11), 2029, 2018. Copyright 2018 University of York,
+licensed under the Apache License 2.0. Every model and dataset is listed with its licence in
+[`models/MANIFEST.md`](models/MANIFEST.md). Some structures used in commercial binaural virtualisers are
 patented; SoundStage avoids copying them and a freedom-to-operate check is planned before any product claim.
 
 ## Contributing

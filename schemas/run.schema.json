@@ -20,7 +20,8 @@
     "stages",
     "outputs",
     "ok",
-    "guard"
+    "guard",
+    "engine"
   ],
   "properties": {
     "schema_version": {
@@ -353,6 +354,18 @@
             }
           },
           "additionalProperties": false
+        }
+      ]
+    },
+    "engine": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "description": "v2 engine details: HRTF set, space, crossover, timbre matcher.",
+          "additionalProperties": true
         }
       ]
     }

@@ -7,7 +7,13 @@ export interface ProfileInfo {
 }
 
 const PROFILE_INFO: Record<string, ProfileInfo> = {
-  max: { label: "Full stage", detail: "Front arc, ear shape, front/back tone and a bass-safe room" },
+  "space:studio": { label: "Studio", detail: "Measured ears in a treated control room: close, dry, faithful" },
+  "space:living_room": { label: "Living room", detail: "Measured ears in a furnished room at home" },
+  "space:car": { label: "Car", detail: "A small cabin with close glass reflections" },
+  "space:club": { label: "Club", detail: "A treated club room, about a second of reverb" },
+  "space:concert_hall": { label: "Concert hall", detail: "A large hall, two seconds of reverb" },
+  "space:cinema": { label: "Cinema", detail: "An auditorium with a short, even decay" },
+  max: { label: "v1 full stage", detail: "The v1 engine: analytic head, front arc, bass-safe room" },
   V0: { label: "Wide only", detail: "Head model only: positions widened around you" },
   V1: { label: "Front arc", detail: "Wide, kept within 60 degrees in front of you" },
   V2: { label: "Ear shape", detail: "Front arc plus a pinna (outer ear) model" },
@@ -24,7 +30,7 @@ export function profileInfo(name: string): ProfileInfo {
 
 /** Order the backend's profile names: the recommended one first, then the ablation chain. */
 export function orderProfiles(names: string[]): string[] {
-  const known = Object.keys(PROFILE_INFO); // "max" is listed first on purpose
+  const known = Object.keys(PROFILE_INFO); // the v2 spaces first, studio first of all
   const rank = (n: string) => (known.includes(n) ? known.indexOf(n) : known.length);
   return [...names].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }

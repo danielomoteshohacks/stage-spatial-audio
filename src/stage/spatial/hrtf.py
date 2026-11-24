@@ -45,8 +45,12 @@ from stage.spatial.hrtfpack import (
 PACK_URL = ("https://github.com/danielomoteshohacks/stage-spatial-audio/releases/download/"
             "hrtf-pack-v1/sadie2-d1-ku100.npz")
 #: SHA-256 of the published pack; a download that does not match is refused.
-PACK_SHA256 = ""
+PACK_SHA256 = "f99b77ff092e44c3d043060630abb68563e4696ca40b4d3a3c447cca5b084c74"
 PACK_FILE = "sadie2-d1-ku100.npz"
+#: The measured studio BRIRs of the same release, the reference the room model is fitted to.
+BRIR_URL = PACK_URL.rsplit("/", 1)[0] + "/sadie2-d1-brir48k.npz"
+BRIR_SHA256 = "7142adb4956c85bbec415c204f04b16ca2ebea88e6cf87f46338d5f798b0ab27"
+BRIR_FILE = "sadie2-d1-brir48k.npz"
 #: Constant latency of every filter, in samples, that holds the fractional delay's pre-ringing.
 BASE_DELAY = 16
 
@@ -103,21 +107,34 @@ def find_pack() -> Path | None:
     return path if path.is_file() else None
 
 
-def download_pack(timeout_s: float = 60.0) -> Path:
-    """Fetch the measured pack into the cache, checking its SHA-256. Used by the Space at start."""
-    target = cache_dir() / "hrtf" / PACK_FILE
-    if target.is_file() and (not PACK_SHA256 or sha256(target) == PACK_SHA256):
+def _download(url: str, sha: str, target: Path, timeout_s: float) -> Path:
+    if target.is_file() and sha256(target) == sha:
         return target
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_suffix(".part")
-    req = urllib.request.Request(PACK_URL, headers={"User-Agent": "soundstage"})
+    req = urllib.request.Request(url, headers={"User-Agent": "soundstage"})
     with urllib.request.urlopen(req, timeout=timeout_s) as resp, open(tmp, "wb") as fh:
         fh.write(resp.read())
-    if PACK_SHA256 and sha256(tmp) != PACK_SHA256:
+    if sha256(tmp) != sha:
         tmp.unlink(missing_ok=True)
-        raise ValueError("the downloaded HRTF pack does not match its published checksum")
+        raise ValueError(f"the file downloaded from {url} does not match its published checksum")
     tmp.replace(target)
     return target
+
+
+def download_pack(timeout_s: float = 60.0) -> Path:
+    """Fetch the measured pack into the cache, checking its SHA-256. Used by the Space at start."""
+    return _download(PACK_URL, PACK_SHA256, cache_dir() / "hrtf" / PACK_FILE, timeout_s)
+
+
+def download_brirs(timeout_s: float = 60.0) -> Path:
+    """Fetch the measured SADIE II studio BRIRs (the room model's reference) into the cache."""
+    return _download(BRIR_URL, BRIR_SHA256, cache_dir() / "hrtf" / BRIR_FILE, timeout_s)
+
+
+def find_brirs() -> Path | None:
+    path = cache_dir() / "hrtf" / BRIR_FILE
+    return path if path.is_file() else None
 
 
 def third_octave_smooth(logmag_db: NDArray, freqs: NDArray, fraction: float = 3.0

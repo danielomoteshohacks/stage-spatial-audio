@@ -38,7 +38,7 @@
   let file: File | null = $state(null);
   let duration: number | null = $state(null);
   let mode: "lite" | "stems" = $state("lite");
-  let profile = $state("max");
+  let profile = $state("space:studio");
   let beta = $state(2.0);
   /** null: let the backend start at the loudest part of the track. */
   let start: number | null = $state(null);

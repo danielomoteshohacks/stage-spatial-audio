@@ -110,7 +110,7 @@ describe("engine maths", () => {
 
 describe("labels and formatting", () => {
   it("puts the recommended profile first and keeps unknown ones", () => {
-    expect(orderProfiles(["V1", "zz", "max", "V0"])).toEqual(["max", "V0", "V1", "zz"]);
+    expect(orderProfiles(["V1", "zz", "max", "space:club", "V0", "space:studio"])).toEqual(["space:studio", "space:club", "max", "V0", "V1", "zz"]);
     expect(profileInfo("zz").label).toBe("zz");
   });
 

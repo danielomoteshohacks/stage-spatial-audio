@@ -23,8 +23,8 @@ from typing import Any
 import soundfile as sf
 
 from stage import pipeline
+from stage.engines import DEFAULT_PROFILE, profile_names
 from stage.pipeline import MODES, Separator
-from stage.render.profiles import PROFILES
 from stage.render.sectors import WIDEN_BETA_MAX, WIDEN_BETA_MIN
 
 ALLOWED_EXTENSIONS = (".wav", ".flac", ".mp3", ".ogg", ".m4a")
@@ -48,7 +48,7 @@ class ValidationError(ValueError):
 @dataclass
 class ServiceOptions:
     mode: str = "lite"
-    profile: str = "max"
+    profile: str = DEFAULT_PROFILE
     beta: float = 2.0
     start: float | str | None = "auto"  # "auto" or None: the loudest window; else seconds
     seconds: float | str | None = None  # None or "": DEFAULT_SECONDS
@@ -224,9 +224,9 @@ def resolve_excerpt(duration: float, start: Any,
 def validate_options(options: ServiceOptions) -> None:
     if options.mode not in MODES:
         raise ValidationError(f"Mode must be one of: {', '.join(MODES)}.")
-    if options.profile not in PROFILES:
+    if options.profile not in profile_names():
         raise ValidationError(f"Unknown profile {options.profile!r}. Known: "
-                              f"{', '.join(sorted(PROFILES))}.")
+                              f"{', '.join(profile_names())}.")
     if not WIDEN_BETA_MIN <= float(options.beta) <= WIDEN_BETA_MAX:
         raise ValidationError(f"Width (beta) must be between {WIDEN_BETA_MIN} and "
                               f"{WIDEN_BETA_MAX}.")

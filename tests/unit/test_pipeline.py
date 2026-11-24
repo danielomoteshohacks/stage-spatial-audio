@@ -116,7 +116,7 @@ def test_a_failing_render_never_crashes_the_run(track, tmp_path, monkeypatch):
     def broken(*args, **kwargs):
         raise MemoryError("out of memory in the renderer")
 
-    monkeypatch.setattr(pipeline, "render_profile", broken)
+    monkeypatch.setattr(pipeline, "render_engine", broken)
     out = tmp_path / "out"
     result = pipeline.run(track, profile="V0", out_dir=out)
     assert not result.ok
@@ -159,7 +159,7 @@ def test_progress_events_arrive_in_order_and_a_broken_callback_is_harmless(track
 
 
 def test_stems_are_rendered_one_at_a_time(track, tmp_path, fake_separator, monkeypatch):
-    real = pipeline.render_profile
+    real = pipeline.render_engine
     active, seen = [0], []
 
     def tracking(audio, sr, profile, beta):
@@ -171,7 +171,7 @@ def test_stems_are_rendered_one_at_a_time(track, tmp_path, fake_separator, monke
         finally:
             active[0] -= 1
 
-    monkeypatch.setattr(pipeline, "render_profile", tracking)
+    monkeypatch.setattr(pipeline, "render_engine", tracking)
     pipeline.run(track, mode="stems", profile="V0", out_dir=tmp_path / "o",
                  separator=fake_separator)
     assert len(seen) == len(STEM_NAMES)

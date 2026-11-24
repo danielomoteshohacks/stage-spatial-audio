@@ -17,7 +17,7 @@
   },
   "requested_mode": "stems",
   "mode": "lite",
-  "profile": "max",
+  "profile": "space:studio",
   "beta": 2.0,
   "fallback": {
     "from": "stems",
@@ -82,5 +82,16 @@
     "reasons": [
       "The tone changes by 3.6 dB around 3.15k Hz."
     ]
+  },
+  "engine": {
+    "engine": "v2",
+    "hrtf": "SADIE II",
+    "space": "studio",
+    "crossover_hz": 120.0,
+    "timbre_match": {
+      "max_correction_db": 4.1,
+      "bands": 22,
+      "upper_gain_db": -9.8
+    }
   }
 }

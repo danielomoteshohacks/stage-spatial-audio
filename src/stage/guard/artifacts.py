@@ -130,6 +130,8 @@ def detect_pre_echo(original: NDArray, render: NDArray, sample_rate: int, *, exc
     after is measured in both signals. A frequency-domain renderer with long frames spreads a
     transient over the whole frame, which raises that ratio; zero-phase filters do the same.
     The window matches backward masking, which hides weaker energy up to about 20 ms ahead.
+    Energy that is already there 20 to 40 ms before the onset (a reverb tail, a sustained note)
+    is not counted: a pre-echo rises toward the transient it belongs to.
     """
     frame = max(1, int(round(0.0025 * sample_rate)))
     eo = _hf_envelope(original, sample_rate, frame) + 1e-20
@@ -145,7 +147,11 @@ def detect_pre_echo(original: NDArray, render: NDArray, sample_rate: int, *, exc
             pre_o, pre_r = eo[t - pre_n : t - 1].mean(), er[t - pre_n : t - 1].mean()
             ratio_o = 10.0 * np.log10(pre_o / post_o)
             ratio_r = 10.0 * np.log10(pre_r / post_r)
-            if ratio_r - ratio_o > excess_db and ratio_r > audible_db:
+            # A pre-echo grows toward the transient; the decaying tail of an earlier note or of
+            # reverberation does not. The render's pre-window must exceed the 20 ms before it.
+            earlier = er[max(0, t - 2 * pre_n) : t - pre_n].mean() if t >= 2 * pre_n else 0.0
+            rising = pre_r > 2.0 * earlier  # 3 dB
+            if ratio_r - ratio_o > excess_db and ratio_r > audible_db and rising:
                 start = (t - pre_n) * frame / sample_rate
                 flags.append(Flag("pre_echo", start, t * frame / sample_rate,
                                   f"{ratio_r - ratio_o:.0f} dB more energy before the transient"))

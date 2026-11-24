@@ -28,11 +28,11 @@ def test_the_only_api_endpoint_is_process(app):
 
 
 def test_profile_choices_cover_every_profile(app):
-    from stage.render.profiles import PROFILES
+    from stage.engines import profile_names
 
     dropdowns = [b for b in app.demo.blocks.values() if isinstance(b, gr.Dropdown)]
     choices = {c[0] if isinstance(c, tuple) else c for c in dropdowns[0].choices}
-    assert choices == set(PROFILES)
+    assert choices == set(profile_names())
 
 
 def test_without_spaces_the_separator_is_not_wrapped(app):
