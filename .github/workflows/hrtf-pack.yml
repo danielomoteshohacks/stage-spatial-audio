@@ -1,0 +1,63 @@
+name: HRTF pack
+
+# Builds the measured-HRTF pack from SADIE II (University of York, Apache-2.0) on a GitHub runner,
+# which has internet access, and publishes it as a release asset. The Space and the benchmark
+# download it from there; nothing large is committed. Runs when the builder changes, or by hand.
+on:
+  push:
+    branches: [main]
+    paths:
+      - tools/hrtf-pack/**
+      - src/stage/spatial/hrtfpack.py
+      - src/stage/spatial/roommetrics.py
+      - .github/workflows/hrtf-pack.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hrtf-pack
+  cancel-in-progress: false
+
+env:
+  TAG: hrtf-pack-v1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      # h5py (BSD-3-Clause) reads SOFA, which is netCDF-4 on HDF5; no SOFA-specific library.
+      - name: Install
+        run: python -m pip install -e . "h5py>=3.10"
+      - name: Cache the SADIE II download
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cache/sadie2
+          key: sadie2-zenodo-12092466
+      - name: Build the pack
+        run: |
+          mkdir -p ~/.cache/sadie2
+          python tools/hrtf-pack/build_pack.py --out dist/hrtf --cache ~/.cache/sadie2
+          ls -la dist/hrtf
+      - name: Publish the release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Measured HRTF pack for SoundStage, built by tools/hrtf-pack from commit ${GITHUB_SHA::7}."
+            echo
+            echo "Source: SADIE II Database, subject D1 (Neumann KU100), The Audio Lab, University of York."
+            echo "Licence: Apache License 2.0. Attribution and checksums are in manifest.json."
+          } > notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/hrtf/* --clobber
+            gh release edit "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" dist/hrtf/* --title "HRTF pack v1 (SADIE II KU100)" \
+              --notes-file notes.md --latest=false
+          fi
