@@ -90,7 +90,8 @@ def width_filter(original: NDArray, render: NDArray, sample_rate: int
     only. Measured on the generated songs: side-to-mid energy 0.27 in the record and 0.06 in the
     v3 render; the centre/side upmix took it to 0.12. This lifts the render's side (L - R) in
     each band by the dB that brings its side-to-mid ratio to the record's (at most WIDTH_MAX_DB
-    up, WIDTH_MAX_CUT_DB down), smoothly across bands. Directions stay where the head filters put them;
+    up, WIDTH_MAX_CUT_DB down), smoothly across bands. Directions stay where the head filters
+    put them;
     what changes is how far apart the two ears' signals are, which is the width a listener
     compares against the original."""
     from stage.guard.checks import third_octave_bands
