@@ -21,7 +21,8 @@ export function hashTint(id: string): Tint {
   const h = hash(id);
   const hue = h % 360;
   const hue2 = (hue + 40 + ((h >> 9) % 80)) % 360;
-  return { t1: `hsl(${hue} 62% 52%)`, t2: `hsl(${hue2} 58% 46%)` };
+    // Softer than full saturation, so tiles and covers read as considered colour, not neon.
+  return { t1: `hsl(${hue} 46% 50%)`, t2: `hsl(${hue2} 42% 38%)` };
 }
 
 export function tintStyle(t: Tint): string {

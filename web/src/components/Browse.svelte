@@ -60,9 +60,28 @@
       return;
     }
     timer = setTimeout(async () => {
-      const r = await run(() => catalog.search(backend, q.trim()));
-      if (r) view = { kind: "search", title: `Results for "${q.trim()}"`, tracks: r.tracks };
+      const term = q.trim();
+      // The server searches the sources live; when it is asleep, search the shelves already here,
+      // so search never comes back empty-handed just because the server is waking.
+      const r = await run(() => catalog.search(backend, term)).catch(() => null);
+      const tracks = r?.tracks ?? localSearch(term);
+      view = { kind: "search", title: `Results for "${term}"`, tracks };
+      if (!r) error = "";
     }, 350);
+  }
+
+  function localSearch(term: string): Track[] {
+    const t = term.toLowerCase();
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local to one search, never rendered
+    const seen = new Set<string>();
+    const out: Track[] = [];
+    for (const s of shelves)
+      for (const tr of s.tracks)
+        if (!seen.has(tr.id) && [tr.title, tr.artist, ...(tr.genres ?? []), s.title].some((x) => x?.toLowerCase().includes(t))) {
+          seen.add(tr.id);
+          out.push(tr);
+        }
+    return out;
   }
 
   $effect(() => {

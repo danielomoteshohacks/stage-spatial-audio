@@ -82,17 +82,43 @@
     return ctx;
   }
 
+  // The committed catalogue (public/catalogue.json, exported from the server's seed) fills Home and
+  // Browse straight away, so the app is never an empty page while the server wakes or if it is
+  // down. When the server answers, its own shelves replace these.
+  async function loadSeedShelves() {
+    if (shelves.length) return;
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}catalogue.json`);
+      if (res.ok && !shelves.length) shelves = ((await res.json()) as { shelves: typeof shelves }).shelves;
+    } catch {
+      // Offline and not cached: the shelves stay empty and the status note explains why.
+    }
+  }
+
   async function check() {
     status = "checking";
-    try {
-      const h = await jobs.health(backend);
-      formats = h.formats;
-      status = "online";
-      const s = await catalog.shelves(backend);
-      shelves = s.shelves;
-    } catch {
-      status = "offline";
+    void loadSeedShelves();
+    // A sleeping Space takes up to a minute or two to wake, and answers the first requests slowly
+    // or with an error, so one failed request is not "offline". Try for about two minutes.
+    const waits = [0, 3000, 5000, 8000, 12000, 15000, 20000, 25000, 30000];
+    for (const w of waits) {
+      if (w) await new Promise((r) => setTimeout(r, w));
+      try {
+        const h = await jobs.health(backend);
+        formats = h.formats;
+        status = "online";
+        try {
+          const s = await catalog.shelves(backend);
+          if (s.shelves.length) shelves = s.shelves;
+        } catch {
+          // Keep the committed shelves.
+        }
+        return;
+      } catch {
+        // Not awake yet; wait and ask again.
+      }
     }
+    status = "offline";
   }
 
   async function refreshLibrary() {
@@ -276,8 +302,21 @@
         void player?.play();
         return;
       }
-      if (status !== "online") throw new Error("The server is not reachable, so this track cannot be rendered now.");
       const track = it.track!;
+      if (status !== "online") {
+        // Without the server there is no spatial render, but the original can still play: fetch
+        // it from its own host (the CC licence allows streaming it) and say plainly what this is.
+        const data = await fetchArrayBuffer(track.audio_url, ac.signal).catch(() => {
+          throw new Error("The server is asleep and this track's host refused a direct stream. Try again in a minute.");
+        });
+        originalBlob = new Blob([data], { type: "audio/mpeg" });
+        const buf = await decodeInto(data);
+        if (token !== runToken) return;
+        attach(buf);
+        error = "Playing the original. The spatial version needs the server, which is waking up.";
+        void player?.play();
+        return;
+      }
       const fmt = pickFormat(formats);
       const opts: JobOptions = { preset: "fast", head, fmt };
       const origPromise = fetchArrayBuffer(catalog.audioUrl(backend, track.id), ac.signal).then(async (data) => {

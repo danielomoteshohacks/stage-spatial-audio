@@ -344,6 +344,13 @@ def launch():
         server_name=os.getenv("GRADIO_SERVER_NAME", "0.0.0.0"),
         server_port=int(os.getenv("GRADIO_SERVER_PORT", "7860")),
         allowed_paths=[str(WORK_ROOT)], show_error=True,
+        # The real cause of "/v3/health answers with the Gradio page": on Spaces, Gradio starts in
+        # server-side-rendering mode, where a Node server owns port 7860 and proxies only Gradio's
+        # own paths to Python (log: "with SSR (Node proxy -> Python :7861)"). Every other path,
+        # including all the v3 and catalogue routes, got the rendered page. Without SSR, Python
+        # serves port 7860 itself and every route is reachable. The web app does not use the
+        # Gradio page, so nothing is lost.
+        ssr_mode=False,
         app_kwargs={"routes": routes,
                     "middleware": [Middleware(CORSMiddleware, allow_origins=["*"],
                                               allow_methods=["GET", "POST"], allow_headers=["*"])]},

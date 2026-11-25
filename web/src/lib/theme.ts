@@ -1,4 +1,4 @@
-// Light by default, dark when the listener chooses it or, with the setting on "system", when the
+// Light by default (even when the system is dark), dark when the listener chooses it or, with the setting on "system", when the
 // system asks for it. The choice is stored on this device only. `?theme=dark` forces a theme for
 // one visit (used by the screenshot and Lighthouse runs); it is never stored.
 
@@ -20,9 +20,11 @@ export function resolveTheme(choice: ThemeChoice, systemDark: boolean): Theme {
 export function loadChoice(): ThemeChoice {
   try {
     const v = localStorage.getItem(KEY);
-    return isChoice(v) ? v : "system";
+    // Light unless the listener picked otherwise: the owner wants white as the default look, so a
+    // phone in system dark mode still opens light until "Dark" or "System" is chosen in Credits.
+    return isChoice(v) ? v : "light";
   } catch {
-    return "system";
+    return "light";
   }
 }
 
