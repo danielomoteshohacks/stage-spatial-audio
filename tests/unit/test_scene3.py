@@ -146,8 +146,8 @@ def test_render_invariants_dry_objects_sum_guard_and_direction(scene):
     assert rep["verdict"] == "pass", rep
     assert rep["low_end"]["identity_corr"] > 0.999
     # The object stems and the low band add up to the render.
-    from stage.spatial.neutral import split_low_high
-    low, _ = split_low_high(mix, sr, plan["crossover_hz"])
+    from stage.scene3.fastdsp import fast_split
+    low, _ = fast_split(mix, sr, plan["crossover_hz"])
     np.testing.assert_allclose(sum(res.objects.values()) + low, res.binaural, atol=2e-3)
     # Direction: the left-panned guitar is louder in the left ear, the right one in the right.
     gl, gr = res.objects["guitar_l"], res.objects["guitar_r"]
@@ -276,3 +276,31 @@ def test_an_unavailable_head_falls_back_to_the_default_pack(monkeypatch):
 def test_two_clusters_on_one_side_keep_distinct_leaves():
     assert side_of("other_left2") == 1 and side_of("other_right3") == -1
     assert infer_role("other_left2") == "other"
+
+
+def test_fast_building_blocks_match_the_originals():
+    from scipy.signal import oaconvolve
+
+    from stage.scene3.fastconv import convolve_feeds
+    from stage.scene3.fastdsp import fast_match_loudness, fast_split
+    from stage.spatial.neutral import match_loudness_upper, split_low_high
+
+    rng = np.random.default_rng(0)
+    sr, n = 22050, 22050 * 4
+    sigs = [rng.standard_normal(n).astype(np.float32) for _ in range(4)]
+    fil = [rng.standard_normal((2, 900)).astype(np.float32) * 0.05 for _ in range(4)]
+    ref = sum(oaconvolve(s[None], f, axes=-1) for s, f in zip(sigs, fil, strict=True))
+    got = convolve_feeds(sigs, list(range(4)), fil, n)
+    np.testing.assert_allclose(got, ref, atol=1e-3)
+    each = convolve_feeds(sigs, list(range(4)), fil, n, per_feed=True)
+    np.testing.assert_allclose(sum(each), ref, atol=1e-3)
+    x = np.cumsum(rng.standard_normal((2, n)), axis=1) * 0.01 + rng.standard_normal((2, n)) * 0.05
+    low, high = split_low_high(x, sr, 120.0)
+    lo2, hi2 = fast_split(x, sr, 120.0)
+    inner = slice(sr, -sr)
+    assert np.abs(low - lo2)[:, inner].max() < 1e-4 * np.abs(low).max()
+    np.testing.assert_allclose(lo2 + hi2, x, atol=1e-5)
+    up = high * 0.7 + rng.standard_normal((2, n)) * 0.01
+    g1 = match_loudness_upper(x, low, up, sr)[1]
+    g2 = fast_match_loudness(x, low, up, sr)[1]
+    assert g2 == pytest.approx(g1, rel=1e-3)

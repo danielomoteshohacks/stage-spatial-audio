@@ -22,6 +22,15 @@
   angular error before and after can be measured on willing listeners; the numbers will be
   published only when there are listeners.
 
+## Built
+
+The first run of the workflow published `hrtf-heads-v1` with D1 (KU100) and human subjects H3 to
+H7 (1.8 MB each; their SHA-256 are in the index, which `stage.spatial.heads` pins). D2 (the
+KEMAR) and H8 failed to build and are not published; the KEMAR was the other dummy head the brief
+asked for. Why they failed is not known (the log tail read here shows only the end of the job);
+the six packs that built are enough for the calibration game, and the failure is on the list for
+the owner.
+
 ## Not done
 
 The subject list was chosen without being able to read the Zenodo record's file list from the

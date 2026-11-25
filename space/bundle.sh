@@ -8,7 +8,7 @@ root="$(dirname "$here")"
 out="${1:-$root/space-bundle}"
 rm -rf "$out"
 mkdir -p "$out"
-cp "$here/app.py" "$here/README.md" "$here/requirements.txt" "$out/"
+cp "$here/app.py" "$here/README.md" "$here/requirements.txt" "$here/packages.txt" "$out/"
 cp -R "$root/src/stage" "$out/stage"
 # Thresholds, templates and room presets are data the package reads at run time (stage.config).
 cp -R "$root/configs" "$out/stage/configs"

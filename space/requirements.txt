@@ -12,3 +12,7 @@ onnxruntime
 huggingface_hub
 # The AudioSet genre tagger (AST, decision 0017); its licence is checked before it is loaded.
 transformers
+# The v3 job routes (stage.server) use FastAPI, which gradio already brings. The neural cascade
+# levels (SOUNDSTAGE_NEURAL=1) additionally need `BS-RoFormer` and `pyyaml`; they are not listed
+# here until the owner has run the first GPU session and chosen the preset (docs/log.md, v3).
+pyyaml

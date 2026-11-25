@@ -290,7 +290,9 @@ class Cascade:
 
     # -- the run ---------------------------------------------------------------------------------
     def run(self, mix: NDArray, sr: int, fallback_stems: dict[str, NDArray] | None = None,
-            refine: bool = True) -> CascadeResult:
+            refine: bool | None = None) -> CascadeResult:
+        if refine is None:
+            refine = bool(self.preset.get("refine", True))
         mix = np.asarray(mix, dtype=np.float32)
         voc, inst = self._timed("L1", lambda: self.level1(mix, sr, fallback_stems))
         vparts = self._timed("L2", lambda: self.level2(voc, sr))

@@ -21,10 +21,10 @@ def app():
     return mod
 
 
-def test_the_api_endpoints_are_process_and_rerender(app):
+def test_the_api_endpoints_are_process_rerender_and_v3(app):
     names = [d.api_name for d in app.demo.fns.values()
              if d.api_name and getattr(d, "api_visibility", "public") != "private"]
-    assert names == ["process", "rerender"]
+    assert names == ["process", "rerender", "v3_process"]
 
 
 def test_profile_choices_cover_every_profile(app):
@@ -120,3 +120,23 @@ def test_v2_process_then_rerender_from_the_cache(app, track, monkeypatch):
 def test_rerender_of_an_unknown_track_is_a_message(app):
     *_, last = app.rerender("0" * 24, "lite", "space:studio", 2.0, "auto", 0.5, "", False)
     assert "expired" in last[0]["error"]
+
+
+def test_v3_event_refuses_a_missing_file_and_bad_options(app):
+    import json
+
+    first = next(iter(app.v3_process(None)))
+    assert json.loads(first)["error"] == "No file was uploaded."
+    out = list(app.v3_process("/nonexistent.flac", '{"character": "wild"}'))
+    assert "refused" in json.loads(out[0])["error"]
+
+
+def test_the_combined_app_serves_gradio_and_the_v3_routes(app):
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app.build_app())
+    assert client.get("/v3/health").json()["engine"] == "soundstage-v3"
+    assert client.get("/").status_code == 200
+    r = client.options("/v3/health", headers={"Origin": "https://soundstage-phi.vercel.app",
+                                              "Access-Control-Request-Method": "GET"})
+    assert r.headers.get("access-control-allow-origin") in ("*", "https://soundstage-phi.vercel.app")

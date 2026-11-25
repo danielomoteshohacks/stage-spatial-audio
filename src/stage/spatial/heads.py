@@ -15,6 +15,7 @@ fallback (the analytic head) is unchanged.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import urllib.request
 from dataclasses import dataclass
@@ -28,6 +29,12 @@ from stage.spatial.hrtf import PACK_FILE, _download, cache_dir, find_pack
 HEADS_BASE = ("https://github.com/danielomoteshohacks/stage-spatial-audio/releases/download/"
               "hrtf-heads-v1/")
 DEFAULT_HEAD = "D1"
+#: SHA-256 of the published index (release hrtf-heads-v1); a different index is refused, so a
+#: head's checksum can only come from the index that was reviewed.
+INDEX_SHA256 = "659987a606fd48051c3a1dec71cc0a79c3b0bd8c4110a485d310158a0460d5a6"
+#: Heads the first build published (D2, the KEMAR, and H8 failed to build: their archive layout
+#: differs from the others and is still to be looked at).
+PUBLISHED = ("D1", "H3", "H4", "H5", "H6", "H7")
 #: What the dummy heads are; the human subjects are labelled by the listener short name in their
 #: own SOFA files (SADIE II documents H3 to H20 as human subjects).
 KNOWN = {"D1": "Neumann KU100 dummy head", "D2": "KEMAR dummy head"}
@@ -48,7 +55,10 @@ def pack_path(head: str) -> Path:
 def fetch_index(timeout_s: float = 30.0) -> dict[str, Any]:
     req = urllib.request.Request(HEADS_BASE + "heads.json", headers={"User-Agent": "soundstage"})
     with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-        return json.loads(resp.read())
+        raw = resp.read()
+    if hashlib.sha256(raw).hexdigest() != INDEX_SHA256:
+        raise ValueError("the heads index does not match its pinned checksum")
+    return json.loads(raw)
 
 
 def ensure_head(head: str, timeout_s: float = 120.0) -> Path:

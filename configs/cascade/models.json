@@ -2,92 +2,235 @@
   "_about": "The separation cascade (decision 0023): every model the levels can load, with its source, licence as read at the source, the number its author or the MVSep tables report, and its size. Nothing here is downloaded at install time: the Space fetches a file on first use and checks its SHA-256. `licence_class` is what the cascade enforces: 'open' (MIT or Apache, any use), 'copyleft' (GPL-3.0 weights, used at run time on the Space and never redistributed by this repository), 'nc' (non-commercial: allowed only for this research demo, with attribution and the note in the credits), 'unverified' (no licence stated at the source: off unless the owner enables it). SDR values are the sources' own, on their own sets, and are not comparable across sets; the set is named in `sdr.set`.",
   "models": {
     "kim_mbr_vocals": {
-      "level": 1, "role": "vocals vs instrumental", "family": "mel_band_roformer",
+      "level": 1,
+      "role": "vocals vs instrumental",
+      "family": "mel_band_roformer",
       "source": "https://huggingface.co/KimberleyJSN/melbandroformer",
-      "file": "MelBandRoformer.ckpt", "size_bytes": 913106900,
+      "file": "MelBandRoformer.ckpt",
+      "size_bytes": 913106900,
       "sha256": "87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e",
-      "licence": "MIT", "licence_class": "open", "licence_read_at": "Hugging Face model card tag, license:mit",
-      "sdr": {"vocals": 10.98, "set": "MVSep Multisong", "read_at": "ZFTurbo/Music-Source-Separation-Training docs/pretrained_models.md"},
+      "licence": "MIT",
+      "licence_class": "open",
+      "licence_read_at": "Hugging Face model card tag, license:mit",
+      "sdr": {
+        "vocals": 10.98,
+        "set": "MVSep Multisong",
+        "read_at": "ZFTurbo/Music-Source-Separation-Training docs/pretrained_models.md"
+      },
       "config": "https://raw.githubusercontent.com/ZFTurbo/Music-Source-Separation-Training/main/configs/KimberleyJensen/config_vocals_mel_band_roformer_kj.yaml",
-      "stems": ["vocals", "other"]
+      "stems": [
+        "vocals",
+        "other"
+      ]
     },
     "anvuew_bsr_vocals": {
-      "level": 1, "role": "vocals vs instrumental", "family": "bs_roformer",
+      "level": 1,
+      "role": "vocals vs instrumental",
+      "family": "bs_roformer",
       "source": "https://huggingface.co/anvuew/BS-RoFormer",
-      "file": "bs_roformer_ft1_anvuew_sdr_12.55.ckpt", "size_bytes": 204493312,
+      "file": "bs_roformer_ft1_anvuew_sdr_12.55.ckpt",
+      "size_bytes": 204493312,
       "sha256": "60347271e8493fdff28ef558c3b2297afb869a1f4462594ed548038264bec395",
-      "licence": "GPL-3.0", "licence_class": "copyleft", "licence_read_at": "Hugging Face model card header, license: gpl-3.0",
-      "sdr": {"vocals": 12.55, "set": "the author's own validation set (named in the file)", "read_at": "checkpoint file name"},
+      "licence": "GPL-3.0",
+      "licence_class": "copyleft",
+      "licence_read_at": "Hugging Face model card header, license: gpl-3.0",
+      "sdr": {
+        "vocals": 12.55,
+        "set": "the author's own validation set (named in the file)",
+        "read_at": "checkpoint file name"
+      },
       "config": "https://huggingface.co/anvuew/BS-RoFormer/resolve/main/config.yaml",
-      "stems": ["vocals", "other"]
+      "stems": [
+        "vocals",
+        "other"
+      ]
     },
     "anvuew_karaoke": {
-      "level": 2, "role": "lead vs backing vocals", "family": "bs_roformer",
+      "level": 2,
+      "role": "lead vs backing vocals",
+      "family": "bs_roformer",
       "source": "https://huggingface.co/anvuew/karaoke_bs_roformer",
-      "file": "karaoke_bs_roformer_anvuew.ckpt", "size_bytes": 204486925,
+      "file": "karaoke_bs_roformer_anvuew.ckpt",
+      "size_bytes": 204486925,
       "sha256": "206d04757cb5f75ca3b55f8a0a48f5c26aa2351d4ff3c7adbfc9affa30ea3ae4",
-      "licence": "GPL-3.0", "licence_class": "copyleft", "licence_read_at": "Hugging Face model card header, license: gpl-3.0; training data by becruily",
-      "sdr": {"set": "not stated", "read_at": "model card"},
+      "licence": "GPL-3.0",
+      "licence_class": "copyleft",
+      "licence_read_at": "Hugging Face model card header, license: gpl-3.0; training data by becruily",
+      "sdr": {
+        "set": "not stated",
+        "read_at": "model card"
+      },
       "config": "https://huggingface.co/anvuew/karaoke_bs_roformer/resolve/main/karaoke_bs_roformer_anvuew.yaml",
-      "stems": ["vocals", "other"]
+      "stems": [
+        "vocals",
+        "other"
+      ]
     },
     "bs_rofo_sw": {
-      "level": 3, "role": "bass, drums, guitar, piano, other, vocals", "family": "bs_roformer",
+      "level": 3,
+      "role": "bass, drums, guitar, piano, other, vocals",
+      "family": "bs_roformer",
       "source": "https://huggingface.co/enerjazzer/BS-ROFO-SW-Fixed",
-      "file": "BS-Rofo-SW-Fixed.ckpt", "size_bytes": 699412152,
+      "file": "BS-Rofo-SW-Fixed.ckpt",
+      "size_bytes": 699412152,
       "sha256": "24e7d35ee9c64415673d3fd33e06a67cac2c103c5df6267ba1576459c775916e",
-      "licence": "not stated", "licence_class": "unverified", "licence_read_at": "Hugging Face model card, license: unknown. This is a re-upload of jarredou's BS-ROFO-SW, whose own repository was removed; third-party conversions tag it MIT but cite no upstream statement. It is also used by the SJTU X-LANCE MSR 2025 system (arXiv 2602.09042).",
-      "sdr": {"set": "not stated at the source", "read_at": "none found"},
+      "licence": "not stated",
+      "licence_class": "unverified",
+      "licence_read_at": "Hugging Face model card, license: unknown. This is a re-upload of jarredou's BS-ROFO-SW, whose own repository was removed; third-party conversions tag it MIT but cite no upstream statement. It is also used by the SJTU X-LANCE MSR 2025 system (arXiv 2602.09042).",
+      "sdr": {
+        "set": "not stated at the source",
+        "read_at": "none found"
+      },
       "config": "https://huggingface.co/enerjazzer/BS-ROFO-SW-Fixed/resolve/main/BS-Rofo-SW-Fixed.yaml",
-      "stems": ["bass", "drums", "other", "vocals", "guitar", "piano"]
+      "stems": [
+        "bass",
+        "drums",
+        "other",
+        "vocals",
+        "guitar",
+        "piano"
+      ]
     },
     "htdemucs_6s": {
-      "level": 3, "role": "bass, drums, guitar, piano, other, vocals (fallback)", "family": "htdemucs",
+      "level": 3,
+      "role": "bass, drums, guitar, piano, other, vocals (fallback)",
+      "family": "htdemucs",
       "source": "https://github.com/facebookresearch/demucs",
-      "file": "fetched by demucs.pretrained", "size_bytes": null, "sha256": null,
-      "licence": "MIT", "licence_class": "open", "licence_read_at": "demucs repository README (no separate weights licence is stated)",
-      "sdr": {"bass": 11.22, "drums": 10.22, "vocals": 8.05, "set": "MVSep Multisong", "read_at": "ZFTurbo docs/pretrained_models.md"},
-      "stems": ["drums", "bass", "other", "vocals", "guitar", "piano"]
+      "file": "fetched by demucs.pretrained",
+      "size_bytes": null,
+      "sha256": null,
+      "licence": "MIT",
+      "licence_class": "open",
+      "licence_read_at": "demucs repository README (no separate weights licence is stated)",
+      "sdr": {
+        "bass": 11.22,
+        "drums": 10.22,
+        "vocals": 8.05,
+        "set": "MVSep Multisong",
+        "read_at": "ZFTurbo docs/pretrained_models.md"
+      },
+      "stems": [
+        "drums",
+        "bass",
+        "other",
+        "vocals",
+        "guitar",
+        "piano"
+      ]
     },
     "drumsep_mdx23c": {
-      "level": 4, "role": "kick, snare, toms, hi-hat, cymbals", "family": "mdx23c",
+      "level": 4,
+      "role": "kick, snare, toms, hi-hat, cymbals",
+      "family": "mdx23c",
       "source": "https://github.com/jarredou/models/releases/tag/DrumSep",
-      "file": "drumsep_5stems_mdx23c_jarredou.ckpt", "size_bytes": null, "sha256": null,
-      "licence": "CC BY-NC-SA 4.0 (as stated by Intel's OpenVINO conversion of this checkpoint; the original release page states none)", "licence_class": "nc",
+      "file": "drumsep_5stems_mdx23c_jarredou.ckpt",
+      "size_bytes": null,
+      "sha256": null,
+      "licence": "CC BY-NC-SA 4.0 (as stated by Intel's OpenVINO conversion of this checkpoint; the original release page states none)",
+      "licence_class": "nc",
       "licence_read_at": "huggingface.co/Intel/drumsep_mdx23c_jarredou_openvino model card, license: cc-by-nc-sa-4.0",
-      "sdr": {"kick": 16.66, "snare": 11.53, "toms": 12.33, "hh": 4.04, "cymbals": 6.36, "set": "DrumSep test", "read_at": "ZFTurbo docs/pretrained_models.md"},
+      "sdr": {
+        "kick": 16.66,
+        "snare": 11.53,
+        "toms": 12.33,
+        "hh": 4.04,
+        "cymbals": 6.36,
+        "set": "DrumSep test",
+        "read_at": "ZFTurbo docs/pretrained_models.md"
+      },
       "config": "https://github.com/jarredou/models/releases/download/DrumSep/config_mdx23c.yaml",
-      "stems": ["kick", "snare", "toms", "hh", "cymbals"]
+      "stems": [
+        "kick",
+        "snare",
+        "toms",
+        "hh",
+        "cymbals"
+      ]
     },
     "anvuew_dereverb": {
-      "level": 5, "role": "dry vocal vs reverb", "family": "mel_band_roformer",
+      "level": 5,
+      "role": "dry vocal vs reverb",
+      "family": "mel_band_roformer",
       "source": "https://huggingface.co/anvuew/dereverb_mel_band_roformer",
-      "file": "dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt", "size_bytes": 913107578,
+      "file": "dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
+      "size_bytes": 913107578,
       "sha256": "9262877b87e9ebb0fb808a456b0a411fa677f5df31c8383c1254af531c078970",
-      "licence": "GPL-3.0", "licence_class": "copyleft", "licence_read_at": "Hugging Face model card header, license: gpl-3.0",
-      "sdr": {"dry": 19.1729, "set": "the author's own validation set (named in the file)", "read_at": "checkpoint file name"},
+      "licence": "GPL-3.0",
+      "licence_class": "copyleft",
+      "licence_read_at": "Hugging Face model card header, license: gpl-3.0",
+      "sdr": {
+        "dry": 19.1729,
+        "set": "the author's own validation set (named in the file)",
+        "read_at": "checkpoint file name"
+      },
       "notes": "Fine-tuned from Kim's vocal model on dry mono single-voice recordings: it pulls stereo and layered vocals towards mono and removes some non-centre harmonies (the author's card). The cascade therefore guards it (bypass when the dry output falls more than 10 dB, as the SJTU X-LANCE system does) and uses the model-free dereverberator for every other stem.",
       "config": "https://huggingface.co/anvuew/dereverb_mel_band_roformer/resolve/main/dereverb_mel_band_roformer_anvuew.yaml",
-      "stems": ["dry", "reverb"]
+      "stems": [
+        "dry",
+        "reverb"
+      ]
     }
   },
   "presets": {
     "best": {
       "why": "Every level, the vocal ensemble and the model dereverberator on the vocals.",
-      "levels": {"1": ["kim_mbr_vocals", "anvuew_bsr_vocals"], "2": ["anvuew_karaoke"], "3": ["bs_rofo_sw", "htdemucs_6s"],
-                 "4": ["drumsep_mdx23c"], "5": ["anvuew_dereverb"], "6": "adress"}
+      "levels": {
+        "1": [
+          "kim_mbr_vocals",
+          "anvuew_bsr_vocals"
+        ],
+        "2": [
+          "anvuew_karaoke"
+        ],
+        "3": [
+          "bs_rofo_sw",
+          "htdemucs_6s"
+        ],
+        "4": [
+          "drumsep_mdx23c"
+        ],
+        "5": [
+          "anvuew_dereverb"
+        ],
+        "6": "adress"
+      },
+      "refine": true
     },
     "fast": {
-      "why": "One vocal model, no karaoke split, no model dereverb, the kit by the DSP rules: the levels that carry the most audible placement for the least GPU time.",
-      "levels": {"1": ["kim_mbr_vocals"], "3": ["htdemucs_6s"], "5": "dsp", "6": "adress"}
+      "why": "One vocal model, no karaoke split, no model dereverb, the kit by the DSP rules: the levels that carry the most audible placement for the least GPU time. The multichannel Wiener layer is off here: it costs several times real time on a CPU and its measured gain (2 to 3 dB on leaky stems) is for the `best` preset.",
+      "levels": {
+        "1": [
+          "kim_mbr_vocals"
+        ],
+        "3": [
+          "htdemucs_6s"
+        ],
+        "5": "dsp",
+        "6": "adress"
+      },
+      "refine": false
     },
     "cpu": {
       "why": "No GPU: the four-stem fallback chain (SoundStage Separator, then htdemucs) and the model-free levels.",
-      "levels": {"3": ["htdemucs_6s"], "5": "dsp", "6": "adress"}
+      "levels": {
+        "3": [
+          "htdemucs_6s"
+        ],
+        "5": "dsp",
+        "6": "adress"
+      },
+      "refine": false
     }
   },
   "ensemble": {
-    "bands_hz": [0, 250, 1000, 4000, 10000, 22050],
+    "bands_hz": [
+      0,
+      250,
+      1000,
+      4000,
+      10000,
+      22050
+    ],
     "weights": null,
     "weights_note": "Per-band weights are fitted on a validation set by scripts/fit_ensemble.py and written here; until they are fitted the cascade uses equal weights and says so in run.json."
   }

@@ -170,6 +170,10 @@ def rerender(track_id, mode, profile, beta, genre="auto", motion=DEFAULT_MOTION,
                         stages)
 
 
+def _v3_event(audio_file, options_json=""):
+    yield from v3_process(audio_file, options_json)
+
+
 def build() -> gr.Blocks:
     genres = [("auto (tagger)", "auto")] + [(t["label"], name) for name, t in templates().items()]
     with gr.Blocks(title="SoundStage backend", delete_cache=(600, int(DEFAULT_TTL_S))) as demo:
@@ -218,12 +222,65 @@ def build() -> gr.Blocks:
                  concurrency_limit=1)
         again.click(rerender, [track_id, mode, profile, beta, genre, motion, plan, export_bed,
                                character], outputs, api_name="rerender", concurrency_limit=1)
+        with gr.Accordion("v3 (whole songs, streamed)", open=False):
+            v3_file = gr.File(label="Track", file_types=list(ALLOWED_EXTENSIONS), type="filepath")
+            v3_opts = gr.Textbox(value="", label="Options (JSON)")
+            v3_out = gr.Textbox(label="Job state (JSON)")
+            gr.Button("Start v3 job").click(_v3_event, [v3_file, v3_opts], [v3_out],
+                                            api_name="v3_process", concurrency_limit=1)
     # One job at a time: a render holds whole-signal arrays, and the GPU quota is per visitor.
     demo.queue(default_concurrency_limit=1, max_size=16)
     return demo
 
 
 demo = build()
+
+# --- v3: streamed whole-song jobs (decision 0027) -------------------------------------------------
+# The job runs inside a Gradio event, because ZeroGPU charges a visitor's daily quota only for GPU
+# calls made inside the event that visitor started. The event streams state snapshots; the
+# segments themselves are fetched by the web app from the HTTP routes below, as they appear.
+
+from stage.server.api import JobStore, create_router, parse_options  # noqa: E402
+from stage.server.providers import default_provider_factory  # noqa: E402
+from stage.service import ValidationError, validate_upload  # noqa: E402
+from stage.stream.job import iter_job, new_job  # noqa: E402
+
+GPU_JOB_S = 120
+_gpu = (lambda fn: spaces.GPU(duration=GPU_JOB_S)(fn)) if spaces is not None else None
+_router, STORE = create_router(JobStore(WORK_ROOT), background=False)
+_provider_for = default_provider_factory(_gpu)
+
+
+def v3_process(audio_file, options_json=""):
+    """Stream the snapshots of one whole-song job; the first carries the job id."""
+    if not audio_file:
+        yield json.dumps({"done": True, "error": "No file was uploaded."})
+        return
+    path = audio_file if isinstance(audio_file, str) else getattr(audio_file, "name", audio_file)
+    try:
+        opts = parse_options(options_json)
+        job = new_job(STORE.root, opts)
+        readable, duration, notes = validate_upload(path, job.dir)
+    except (ValueError, TypeError, ValidationError) as exc:
+        yield json.dumps({"done": True, "error": f"The upload or settings were refused: {exc}"})
+        return
+    job.update(notes=notes, source_duration_s=round(duration, 2))
+    with STORE.lock:
+        STORE.jobs[job.id] = job
+    for j in iter_job(job, readable, _provider_for(opts.preset)):
+        yield json.dumps(j.snapshot())
+
+
+def build_app():
+    """The Gradio demo plus the v3 HTTP routes, with CORS so the web app can fetch segments."""
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
+    api = FastAPI(title="SoundStage backend")
+    api.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"],
+                       allow_headers=["*"])
+    api.include_router(_router)
+    return gr.mount_gradio_app(api, demo, path="/", allowed_paths=[str(WORK_ROOT)])
 
 def fetch_assets() -> None:
     """Download the measured HRTF pack once, on Hugging Face's servers, in the background.
@@ -257,5 +314,7 @@ if __name__ == "__main__":
     WORK_ROOT.mkdir(parents=True, exist_ok=True)
     start_sweeper()
     fetch_assets()
-    demo.launch(server_port=int(os.getenv("GRADIO_SERVER_PORT", "7860")),
-                allowed_paths=[str(WORK_ROOT)], show_error=True)
+    import uvicorn
+
+    uvicorn.run(build_app(), host=os.getenv("GRADIO_SERVER_NAME", "0.0.0.0"),
+                port=int(os.getenv("GRADIO_SERVER_PORT", "7860")))

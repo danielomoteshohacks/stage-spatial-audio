@@ -527,3 +527,39 @@ stems and the low band, direction of the guitar pair, v3 more than twice as wide
 ### Next
 
 Phase 3: whole songs, chunked and streamed, Opus delivery, and the real-time factor table.
+
+## 2026-11-25: v3 Phase 3, whole songs, streamed
+
+### Done
+
+- `stage.stream`: chunk spans and an overlap-add assembler, Opus and AAC delivery with codec
+  context, a job that separates, places, renders and encodes chunk by chunk, a windowed whole-song
+  guard; `stage.server.api` (FastAPI routes: upload, state, segments, files, bench) mounted around
+  the Gradio app, with the job run inside a Gradio event for ZeroGPU quota (decision 0027).
+- Speed: batched partitioned convolution with cached spectra, float32, the crossover applied once,
+  fast loudness matching, positions quantised for moving sources.
+
+### Measured
+
+30 s excerpt: v2 0.28 (warm) real-time factor, v3 first version 0.76, v3 now 0.16 with stems and
+0.075 without. A 163 s song: 46 s end to end, render RTF 0.033, time to first sound 1.9 s with
+model-free leaves. Table in decision 0027. 25 new tests: seams, codec joints, whole job, API.
+
+### What went wrong
+
+- The v3 renderer was slower than v2 at first (0.76 against 0.28): per-leaf zero-phase crossover
+  filters (2.4 s of 5.4), per-source FFT convolution, and a 30-iteration loudness bisection that
+  re-filtered the whole signal each time.
+- The whole-song guard took 81 s for a 163 s song (a stack of 25 full-length patches for the
+  musical-noise check and multi-million-point FFTs), longer than the render; it now checks windows.
+- Two separate guard-report numbers read "review" for a pure synthetic tone because the alignment
+  estimator locks onto the tone's period; the guard tests use signals with a beat.
+- ZeroGPU quota is attributed only inside the Gradio event, so a job cannot be a plain background
+  thread on the Space; the job is a generator run inside the event.
+- The Wiener refinement costs several times real time on a CPU, so it is on for the `best` preset
+  only; the first end-to-end test took 57 s with it on.
+- The time to first sound with real neural separation is not measured: no GPU here.
+
+### Next
+
+Phase 4: the streaming catalogue.

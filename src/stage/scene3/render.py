@@ -47,9 +47,11 @@ from stage.scene.render import (
     distance_gain,
     openness_curve,
 )
+from stage.scene3.fastconv import convolve_feeds
+from stage.scene3.fastdsp import fast_match_loudness, fast_split
 from stage.scene3.plan import object_paths
 from stage.spatial.hrtf import BASE_DELAY, HrtfSet, get_hrtf
-from stage.spatial.neutral import match_loudness_upper, split_low_high, timbre_filter
+from stage.spatial.neutral import timbre_filter
 from stage.spatial.room import Brir, brir, get_space
 
 #: Largest boost of the directional bands, in dB (both ears alike).
@@ -165,89 +167,161 @@ def _mono(x: NDArray) -> NDArray:
     return mid * g
 
 
+def _trim(h: NDArray, max_s: float, sr: int) -> NDArray[np.float32]:
+    """The response cut at `max_s` (the dry stage has nothing after 80 ms), as float32."""
+    return np.ascontiguousarray(h[:, : int(max_s * sr)], dtype=np.float32)
+
+
+@lru_cache(maxsize=1024)
+def _filter(space: str, sr: int, az: float, el: float, dist: float, directional_db: float,
+            head: str, early: bool) -> NDArray[np.float32]:
+    """direct + early reflections (or the direct sound alone) as a trimmed float32 filter."""
+    b = _brir3(space, sr, az, el, dist, (), directional_db, head)
+    return _trim(b.direct + b.early if early else b.direct, 0.1, sr)
+
+
 def render_v3(audio: NDArray, sample_rate: int, plan: dict[str, Any],
               leaves: dict[str, NDArray], returns: dict[str, NDArray] | None = None,
-              export_bed: bool = False, directional_db: float = 0.0) -> SceneResult:
-    """Render a v3 plan. `leaves` and `returns` (the dereverberated parts' reverb) are (2, n)."""
+              export_bed: bool = False, directional_db: float = 0.0, want_objects: bool = True,
+              t0_s: float = 0.0, timings: dict[str, float] | None = None) -> SceneResult:
+    """Render a v3 plan. `leaves` and `returns` (the dereverberated parts' reverb) are (2, n).
+
+    `want_objects=False` skips the per-object stems (the streaming path), which lets sources that
+    share a filter be summed before they are convolved. `t0_s` is the time of the first sample
+    in the song, so events and breathing follow the song's clock when a chunk is rendered alone.
+    `timings`, if given, receives seconds per stage.
+    """
     t_start = time.perf_counter()
-    audio = np.asarray(audio, dtype=np.float64)
+    tm = timings if timings is not None else {}
+
+    def tick(name: str, t: float) -> float:
+        now = time.perf_counter()
+        tm[name] = tm.get(name, 0.0) + now - t
+        return now
+
+    t = time.perf_counter()
+    audio = np.asarray(audio, dtype=np.float32)
     sr = int(sample_rate)
     n = audio.shape[1]
     space = plan.get("space", "dry_stage")
     head = str(plan.get("hrtf") or "D1")
     hs = get_hrtf(sr, head=head)
     crossover = float(plan.get("crossover_hz", 120.0))
-    low, high_mix = split_low_high(audio, sr, crossover)
-    block_times = (np.arange((n + HOP - 1) // HOP + 1) * HOP + BLOCK / 2) / sr
+    low, high_mix = fast_split(audio, sr, crossover)
+    block_times = t0_s + (np.arange((n + HOP - 1) // HOP + 1) * HOP + BLOCK / 2) / sr
     openness = openness_at(plan, block_times)
     bed = _Bed(n, export_bed)
-    objects_out: dict[str, NDArray] = {}
-    total = np.zeros((2, n))
+    t = tick("split", t)
+
+    # Gather every source: static ones go to the batched convolver, moving ones are rendered
+    # block by block.
+    feeds: list[tuple[int, NDArray, tuple, NDArray]] = []  # object index, signal, key, filter
+    moving_out: dict[int, NDArray] = {}
     moving = 0
-    for obj in plan["stems"]:
-        name = obj["name"]
-        y = np.zeros((2, n))
+    names = [o["name"] for o in plan["stems"]]
+    for oi, obj in enumerate(plan["stems"]):
         gain = distance_gain(float(obj["dist"])) * 10.0 ** (float(obj.get("gain_db", 0.0)) / 20.0)
         dist = float(obj["dist"])
         if obj["kind"] == "return":
             src = (returns or {}).get(obj["leaf"].split("~")[0])
             if src is None:
                 continue
-            _, high = split_low_high(np.asarray(src, dtype=np.float64), sr, crossover)
+            high = np.asarray(src, dtype=np.float32)  # full band: the crossover comes after
             gate = transient_gate(high, sr)
             for i, f in enumerate(obj["feeds"]):
                 ch = 0 if f["ch"] == "L" else 1
                 d = _highpass(decorrelate(high[ch], seed=211 * (ch + 1) + 17 * i, sample_rate=sr,
                                           gate=gate), sr)
-                sig = d * np.sqrt(f["weight"]) * gain
-                # The return is diffuse by design: direct HRTF only, no early reflections.
-                y += render_static(sig, _direct_only(space, sr, f["az"], f["el"],
-                                                     directional_db, head))
+                sig = (d * np.sqrt(f["weight"]) * gain).astype(np.float32)
+                key = (space, sr, round(f["az"], 1), round(f["el"], 1), directional_db, head,
+                       "direct")
+                feeds.append((oi, sig, key, _filter(space, sr, round(f["az"], 1),
+                                                    round(f["el"], 1), 1.5, directional_db, head,
+                                                    False)))
                 bed.add(sig, f["az"], f["el"])
-        else:
-            if obj["leaf"] not in leaves:
-                continue
-            _, high = split_low_high(np.asarray(leaves[obj["leaf"]], dtype=np.float64), sr,
-                                     crossover)
-            mono = _mono(high) if any(f["ch"] == "M" for f in obj["feeds"]) else None
-            dynamic = bool(obj.get("events")) or bool(obj.get("breathes"))
-            paths = object_paths(obj, plan, block_times, openness) if dynamic else None
-            for i, f in enumerate(obj["feeds"]):
-                sig = gain * (mono if f["ch"] == "M" else high[0 if f["ch"] == "L" else 1])
-                if dynamic and (np.ptp(paths[i][0]) > 0.5 or np.ptp(paths[i][1]) > 0.5):
-                    az_b, el_b = paths[i]
-                    y += render_path(sig, az_b, el_b, dist, hs, directional_db)
-                    ma, me = float(np.mean(az_b)), float(np.mean(el_b))
-                    room = _brir3(space, sr, round(ma, 1), round(me, 1), round(dist, 2), (),
-                                  directional_db, head).early
-                    y += oaconvolve(sig[np.newaxis], room, axes=-1)[
-                        :, BASE_DELAY : BASE_DELAY + n]
-                    bed.add(sig, ma, me)
-                    moving += 1
-                else:
-                    a0 = float(paths[i][0][0]) if dynamic else float(f["az"])
-                    e0 = float(paths[i][1][0]) if dynamic else float(f["el"])
-                    b = _brir3(space, sr, round(a0, 1), round(e0, 1), round(dist, 2), (),
-                               directional_db, head)
-                    y += render_static(sig, b)
-                    bed.add(sig, a0, e0)
-        objects_out[name] = y
-        total += y
+            continue
+        if obj["leaf"] not in leaves:
+            continue
+        # The leaf goes in full band: the head filters and reflections are linear, so removing
+        # everything below the crossover from their *sum* (one filtering) equals filtering each
+        # leaf first (15 filterings).
+        high = np.asarray(leaves[obj["leaf"]], dtype=np.float32)
+        mono = _mono(high) if any(f["ch"] == "M" for f in obj["feeds"]) else None
+        dynamic = bool(obj.get("events")) or bool(obj.get("breathes"))
+        paths = object_paths(obj, plan, block_times, openness) if dynamic else None
+        for i, f in enumerate(obj["feeds"]):
+            sig = (gain * (mono if f["ch"] == "M" else high[0 if f["ch"] == "L" else 1])
+                   ).astype(np.float32)
+            if dynamic and (np.ptp(paths[i][0]) > 0.5 or np.ptp(paths[i][1]) > 0.5):
+                az_b, el_b = paths[i]
+                y = render_path(sig, az_b, el_b, dist, hs, directional_db).astype(np.float32)
+                moving_out[oi] = moving_out.get(oi, 0.0) + y
+                ma, me = round(float(np.mean(az_b)), 1), round(float(np.mean(el_b)), 1)
+                # The reflections of a moving source are those of its mean position.
+                early_only = _filter(space, sr, ma, me, round(dist, 2), directional_db, head,
+                                     True).copy()
+                early_only[:, : int(0.002 * sr)] = 0.0  # the direct sound is already in `y`
+                feeds.append((oi, sig, (space, sr, ma, me, round(dist, 2), directional_db, head,
+                                        "early"), early_only))
+                bed.add(sig, ma, me)
+                moving += 1
+            else:
+                a0 = round(float(paths[i][0][0]) if dynamic else float(f["az"]), 1)
+                e0 = round(float(paths[i][1][0]) if dynamic else float(f["el"]), 1)
+                feeds.append((oi, sig, (space, sr, a0, e0, round(dist, 2), directional_db, head,
+                                        "full"),
+                              _filter(space, sr, a0, e0, round(dist, 2), directional_db, head,
+                                      True)))
+                bed.add(sig, a0, e0)
+    t = tick("sources", t)
+
+    objects_out: dict[str, NDArray] = {}
+    if want_objects:
+        outs = convolve_feeds([f[1] for f in feeds], [f[2] for f in feeds], [f[3] for f in feeds],
+                              n, per_feed=True)
+        acc: dict[int, NDArray] = {}
+        for (oi, *_), y in zip(feeds, outs, strict=True):
+            acc[oi] = acc.get(oi, 0.0) + y[:, BASE_DELAY : BASE_DELAY + n]
+        for oi, y in moving_out.items():
+            acc[oi] = acc.get(oi, 0.0) + y
+        for oi, y in acc.items():
+            objects_out[names[oi]] = y.astype(np.float32)
+        for k in objects_out:
+            objects_out[k] = fast_split(objects_out[k], sr, crossover)[1]
+        total = sum(objects_out.values()) if objects_out else np.zeros((2, n), np.float32)
+    else:
+        groups: dict[tuple, list] = {}
+        for _, sig, key, filt in feeds:
+            g = groups.setdefault(key, [np.zeros(n, np.float32), filt])
+            g[0][: sig.size] += sig[:n]
+        keys = list(groups)
+        out = convolve_feeds([groups[k][0] for k in keys], keys, [groups[k][1] for k in keys], n)
+        total = out[:, BASE_DELAY : BASE_DELAY + n].copy()
+        for y in moving_out.values():
+            total += y
+        total = fast_split(total, sr, crossover)[1]
+    t = tick("convolve", t)
+
     # Neutrality: one timbre filter and one gain for the whole upper band and every object stem.
     h, timbre = timbre_filter(high_mix, total, sr)
-    upper = fftconvolve(total, h[np.newaxis], axes=-1)[:, :n]
-    upper_m, gain_u = match_loudness_upper(audio, low, upper, sr)
+    h32 = np.asarray(h, dtype=np.float32)[np.newaxis]
+    upper = fftconvolve(total, h32, axes=-1)[:, :n]
+    upper_m, gain_u = fast_match_loudness(audio, low, upper, sr)
     timbre["upper_gain_db"] = round(20.0 * float(np.log10(gain_u)), 2)
     for k in objects_out:
-        objects_out[k] = gain_u * fftconvolve(objects_out[k], h[np.newaxis], axes=-1)[:, :n]
+        objects_out[k] = (gain_u * fftconvolve(objects_out[k], h32, axes=-1)[:, :n]).astype(
+            np.float32)
     if bed.data is not None:
         bed.data[bed.names.index("L")] += low[0]
         bed.data[bed.names.index("R")] += low[1]
-    return SceneResult(binaural=low + upper_m, objects=objects_out, bed=bed.data, info={
-        "engine": "v3-objects", "hrtf": hs.name, "space": space, "crossover_hz": crossover,
-        "timbre_match": timbre, "objects": list(objects_out), "moving_sources": moving,
-        "directional_db": directional_db, "late_field": False,
-        "render_s": round(time.perf_counter() - t_start, 3)})
+    t = tick("neutral", t)
+    return SceneResult(binaural=(low + upper_m).astype(np.float32), objects=objects_out,
+                       bed=bed.data, info={
+        "engine": "v3-objects", "hrtf": hs.name, "head": head, "space": space,
+        "crossover_hz": crossover, "timbre_match": timbre, "objects": names,
+        "moving_sources": moving, "directional_db": directional_db, "late_field": False,
+        "render_s": round(time.perf_counter() - t_start, 3), "stage_s": {
+            k: round(v, 3) for k, v in tm.items()}})
 
 
 @lru_cache(maxsize=256)
