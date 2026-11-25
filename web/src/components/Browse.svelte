@@ -45,6 +45,8 @@
     view = { kind: "genre", title: s?.title ?? key, tracks: s?.tracks ?? [] };
     const more = await run(() => catalog.genre(backend, key));
     if (more) view = { kind: "genre", title: more.title, tracks: more.tracks };
+    // The shelf's own songs are already listed; "more from the server" failing is not an error.
+    else if (view.tracks.length) error = "";
   }
 
   async function openArtist(name: string) {

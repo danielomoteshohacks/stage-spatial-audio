@@ -77,6 +77,8 @@ jobs:
                   break
           assert last is not None, "no job state came back"
           print("final:", {k: last.get(k) for k in ("status", "error", "done", "separator", "duration_s")})
+          if last.get("trace"):
+              print("server trace:\n" + last["trace"])
           assert not last.get("error"), last.get("error")
           assert first_seg, "no segment was streamed"
           name = first_seg["file"] if isinstance(first_seg, dict) else first_seg
