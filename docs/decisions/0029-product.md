@@ -13,7 +13,9 @@ script; neither is derived at runtime from the other.
 **Information architecture.** Five destinations: Home (continue, shelves), Browse (search across
 the whole catalogue, genres), Library (renders the listener saved on this device), Create (bring
 your own song, with options), Credits (licences, appearance, backend address, calibration). A
-bottom tab bar on phones, a left rail from 900 px. A mini player stays above the tab bar; the full
+bottom tab bar of five on phones (Credits is the fifth, because the licence credits and the
+appearance setting must be reachable on a phone; they were not in the first build), a left rail
+from 900 px. A mini player stays above the tab bar; the full
 player is a sheet.
 
 **One glossy object.** The play button is the only glossy, coloured-shadow element; cards are
@@ -39,7 +41,7 @@ contrast of at least 4.5:1, reduced motion honoured.
 - Lighthouse mobile, median of 3: performance 0.98 light and 0.99 dark; accessibility 1.00;
   best practices 0.96 (`web/scripts/lighthouse.mjs`).
 - Mid-range Android profile (4x CPU, slow 4G): FCP 456 ms, LCP 732 ms, TBT 52 ms, 105 KB.
-- Screenshots of every screen in both themes, phone and desktop, are in `docs/screens/` (48 images),
+- Screenshots of every screen in both themes, phone and desktop, are in `docs/screens/` (52 images),
   produced by `web/e2e/screens.mjs` against a mock backend that replays real renderer output.
 - 47 unit tests cover the stream scheduler (segment starts, gaps, trimming), scene geometry,
   calibration scoring and the theme helpers.

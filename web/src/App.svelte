@@ -202,6 +202,7 @@
   }
 
   async function finish(s: JobState, token: number) {
+    let spatialFlac: Blob | null = null;
     // Wait for the last segments, then keep the whole render on this device.
     for (let i = 0; i < 100 && pumping; i++) await new Promise((r) => setTimeout(r, 100));
     await pump(s, token);
@@ -216,6 +217,7 @@
       const rep = await fetch(jobs.fileUrl(backend, s.id, "report.json")).then((r) => r.json());
       guard = { verdict: rep.verdict, reasons: rep.reasons, coverage: rep.coverage ?? null };
       const flac = await fetch(jobs.fileUrl(backend, s.id, "spatial.flac")).then((r) => r.blob());
+      spatialFlac = flac;
       if (originalBlob && current) {
         await saveEntry({
           id: crypto.randomUUID(), name: current.title, title: current.title, artist: current.artist,
@@ -229,8 +231,17 @@
     } catch {
       // Saving is a convenience: the song keeps playing without it.
     }
-    if (player && originalBuf) {
-      conditions = [{ id: "original", label: "Original", buffer: originalBuf }];
+    // The listening test compares the original with the whole spatial render, decoded from the
+    // FLAC kept above. If that fails there is nothing to compare, and the test says so.
+    try {
+      if (originalBuf && spatialFlac) {
+        const full = await decodeInto(await spatialFlac.arrayBuffer());
+        if (token === runToken) {
+          conditions = [{ id: "original", label: "Original", buffer: originalBuf }, { id: "v3", label: "SoundStage v3", buffer: full }];
+        }
+      }
+    } catch {
+      conditions = [];
     }
   }
 
@@ -472,7 +483,7 @@
 </Sheet>
 
 <Sheet open={sheet === "test"} title="Listening test" onclose={() => sheet === "test" && (sheet = "none")}>
-  {#if BlindTest && conditions.length && ctx && current}
+  {#if BlindTest && conditions.length > 1 && ctx && current}
     <BlindTest {ctx} track={current.title} {conditions} />
   {:else}
     <p class="muted">Play a song to the end of its render first: the test compares what you just heard.</p>

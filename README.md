@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/danielomoteshohacks/stage-spatial-audio/actions/workflows/ci.yml/badge.svg)](https://github.com/danielomoteshohacks/stage-spatial-audio/actions/workflows/ci.yml)
 [![Licence](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](LICENSE)
-![Status](https://img.shields.io/badge/status-v2%20in%20listening%20tests-1FC8B4.svg)
+![Status](https://img.shields.io/badge/status-v3%20in%20listening%20tests-1FC8B4.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 
 > SoundStage is an independent research and engineering project. It is not affiliated with, or endorsed by, Spotify, Apple or Dolby.
@@ -90,26 +90,86 @@ Tracks are processed and deleted after 30 minutes; use audio you own or may use.
 
 ## Status
 
-v2 is live: <https://soundstage-phi.vercel.app> (web app) and
-<https://danieltesh-soundstage.hf.space> (processing). What exists, honestly:
+v3 is live: <https://soundstage-phi.vercel.app> (web app) and
+<https://danieltesh-soundstage.hf.space> (processing). v2 sounded like the stereo mix pushed
+backwards (decision 0022); v3 treats the song as objects. What exists, honestly:
 
-- **Real ears and rooms** (decisions 0012 to 0014): head-related filters built from the SADIE II
-  KU100 measurements on GitHub Actions; six spaces with image-source reflections and a late field
-  matched to the head's measured diffuse coherence; the studio fitted to the measured York BRIRs.
-- **The scene and the plan** (0016 to 0018): stems split into direct, ambient and transient
-  parts, placed as objects with a surround and height bed, tempo-locked motion with a speed cap,
-  ten genre templates, an editable plan.json.
-- **Fidelity guard** (0011): BS.1770 loudness, true peak, bass identity, timbre, timestamped
-  artifact flags, a verdict with reasons, on every render.
-- **Our separator** (0015): the engine, training code and Kaggle notebook are done and tested;
-  **its weights are not trained yet**. Until its evaluation reaches htdemucs, the Space uses
-  htdemucs, and run.json says which separator ran.
-- **The product** (0020): new brand, library on the phone, cover-art colours, stage view, Feel,
-  blind test. Head tracking is designed, not shipped.
-- **Not claimed:** no perceptual result yet. The numbers below are objective proxies; the blind
-  test decides.
+- **Objects, not a widened stereo image** (0024 to 0026): each separated part is a dry point source
+  through a measured head at its own direction, with a sparse set of early reflections and no
+  late tail; the room that was in the recording returns from the sides, rear and above; placement
+  comes from data (`configs/placement/`); parts move on musical events within speed and range caps;
+  several measured heads and a short calibration game that picks the one that fits your ears.
+- **Separation cascade** (0023): six levels behind a licence-checked manifest, with our own
+  post-processing and a per-part quality score. **The neural levels have never run**: this
+  environment has no GPU and could not reach the weight hosts. What runs today is the model-free
+  levels on top of a four-stem separator (htdemucs on the Space).
+- **Whole songs, streamed** (0027): rendered in chunks, played while they render, Opus segments;
+  time to first sound 1.9 s on the model-free path; first sound with the neural cascade is not measured.
+- **A catalogue to stream** (0028): 115 openly licensed tracks (CC BY, CC BY-SA; never NoDerivatives),
+  verified, with creator and licence shown, search and 11 shelves.
+- **The product** (0029, `web/BRAND.md`): light by default and dark, tab bar, mini player, full
+  now-playing with an Original and Spatial switch, library on the device, calibration game,
+  blind test with a slot for a reference rendering you load yourself. Lighthouse (mobile, median of
+  3): performance 0.98 light and 0.99 dark, accessibility 1.00. Screens: [`docs/screens/`](docs/screens/).
+- **Fidelity guard** (0011), **real ears** (0012 to 0014), **our separator** (0015, **weights not
+  trained yet**): as in v2.
+- **Not claimed:** no perceptual result yet, and nothing here says SoundStage matches or beats any
+  commercial format. The numbers below are objective measurements of where sound is placed; the
+  blind test decides what people prefer.
 
-## Benchmark: v1 against v2
+## Benchmark: v1, v2 and v3
+
+Two benchmarks, because the first one cannot judge v3. Both are objective, on generated songs
+(no recordings), reproducible with the scripts named, raw rows in
+[`docs/benchmarks/`](docs/benchmarks/) (decision 0030).
+
+**1. Where the sound is placed.** `scripts/benchmark_groundtruth.py`: two generated songs of 15
+parts with known 3D positions, folded to stereo; each engine sees only the stereo fold and the
+stems it is given, 30 s, means. "True parts" hands v3 the 15 true parts (what a perfect separator
+would give); "four stems" hands v3 the four true stems and our model-free split of them (what
+today's separators plus our DSP levels give). v2 always gets the four stems.
+
+| Measure | Truth | v2 | v3, true parts | v3, four stems |
+|---|---|---|---|---|
+| Direct energy outside the front (azimuth) | 31.5% | 14.1% | **45.2%** | 30.1% |
+| Distance of the direction-energy map from the truth (degrees, lower better) | 0 | 24.5 | 12.3 | **6.6** |
+| Per-part angular error, RMS (degrees, lower better) | 0 | 51.2 | **16.4** | 67.2 |
+| Median direct-to-reverberant ratio (dB) | n/a | -6.1 | 26.2 | 29.2 |
+| IACC (lower: further from the head centre) | n/a | 0.72 | 0.54 | 0.89 |
+| Timbre deviation (dB, lower better) | n/a | 1.73 | 0.78 | 0.64 |
+| Guard verdict | | pass, pass | pass, pass | review, pass |
+
+Read it plainly. With a perfect separator v3 puts sources where they belong (16 degrees against
+51) and carries 3.2 times v2's share outside the front, but that share (45%) is more than the
+truth's 31.5%: v3's templates place guitars and pads wider than these generated songs do. With only
+four stems and model-free splitting, v3's overall direction map is the closest to the truth
+(6.6 degrees), yet individual parts are in the wrong place more often than in v2 (67 degrees, for
+example two guitars split by a pan cluster are not matched to the right original). **v3 needs the
+neural cascade to deliver its promise, and the neural cascade has not been run.**
+
+**2. The v2-era proxies.** `scripts/benchmark_spatial.py`, five generated songs, 30 s, means:
+
+| Metric | Better | v1 Lite | v2 Lite | v2 stems, studio | v2 stems, living room | v3 Lite | v3 four stems |
+|---|---|---|---|---|---|---|---|
+| IACC | lower | 0.956 | 0.887 | 0.973 | **0.830** | 1.000 | 0.995 |
+| ITD spread (us) | higher | 96.5 | 184 | 103 | **273** | 11.5 | 28.1 |
+| ILD spread (dB) | higher | 7.19 | 5.96 | 6.46 | **7.60** | 4.82 | 6.30 |
+| Lateral energy | higher | 0.0068 | **0.118** | 0.0094 | 0.0804 | 0.000 | 0.001 |
+| Timbre deviation (dB) | lower | 4.45 | 1.20 | **0.95** | 2.39 | 1.36 | 1.96 |
+| Artifact flags per 30 s | lower | 18.2 | **0** | **0** | **0** | 0.2 | **0** |
+| Bass correlation (< 120 Hz) | higher | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
+| Render time, 30 s, 4 vCPU (s), without separation | lower | 2.1 | 4.4 | 10.9 | 11.0 | **1.4** | 1.5 |
+| Guard verdict | | 5 review | 5 pass | 5 pass | 5 pass | 1 review, 4 pass | 5 pass |
+
+**On these proxies v3 scores worse than v2**, and that is what they measure, not a hidden win.
+They reward interaural decorrelation (low IACC, wide ITD and lateral energy), which v2 produced
+by sending every sound through a room. A dry source straight ahead is, correctly, nearly identical
+in both ears, and the generated songs keep the vocal, chords and drums centred, so v3 on a
+centre-heavy mix reads as nearly mono on these numbers. Whether it sounds more outside the head,
+because direction and distance cues do that work instead of room reverberation, is exactly what
+the proxies cannot say and the blind test must. Where v3 does not win, decision 0030 says why.
+
+## Benchmark: v1 and v2 (the earlier table)
 
 Five generated multitrack songs (synthesised drums, bass, chords, a formant voice, ambience; no
 recordings), 30 s each, `scripts/benchmark_spatial.py`, means (decision 0021):

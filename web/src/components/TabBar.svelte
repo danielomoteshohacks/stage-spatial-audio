@@ -1,7 +1,9 @@
 <script lang="ts">
-  // Four places: Home, Browse, Library, Create. A bottom bar of translucent glass on a phone and
-  // a left rail from 900 px, the way a streaming app does it, with the wordmark and the theme
-  // switch in the rail.
+  // Home, Browse, Library, Create, and Credits. A bottom bar of translucent glass on a phone and
+  // a left rail from 900 px, the way a streaming app does it. Credits opens a sheet (licences,
+  // appearance, backend address, the listening test); on a phone it is the fifth tab, because the
+  // licence credits must be reachable there, and in the rail it sits in the footer with the
+  // theme switch.
   import Icon, { type IconName } from "./Icon.svelte";
   import Logo from "./Logo.svelte";
   import type { ThemeChoice } from "../lib/theme";
@@ -43,6 +45,12 @@
         </button>
       </li>
     {/each}
+    <li class="phone-only">
+      <button type="button" onclick={oncredits}>
+        <Icon name="info" size={22} />
+        <span>Credits</span>
+      </button>
+    </li>
   </ul>
   <div class="foot">
     <button type="button" class="aux" onclick={ontheme} aria-label={themeLabel} title={themeLabel}>
@@ -76,7 +84,7 @@
     margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
   }
   li button {
     width: 100%;
@@ -99,6 +107,9 @@
     color: var(--accent);
   }
   @media (min-width: 900px) {
+    .phone-only {
+      display: none;
+    }
     .nav {
       top: 0;
       right: auto;

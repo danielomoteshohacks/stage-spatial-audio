@@ -267,6 +267,29 @@
     gap: var(--gap-2);
   }
 
+  .segmented {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: var(--gap-2);
+  }
+
+  .segmented button {
+    min-height: 44px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--hairline-strong);
+    background: transparent;
+    color: var(--text);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .segmented button[aria-checked="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+
   .chips {
     display: flex;
     gap: var(--gap-2);

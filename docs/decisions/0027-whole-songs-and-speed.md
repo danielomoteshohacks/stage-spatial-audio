@@ -1,6 +1,6 @@
 # 0027. Whole songs, streamed while they render; speed; and what v3 is judged by
 
-- Status: accepted (the targets section is completed in Phase 6)
+- Status: accepted
 - Date: 2026-11-25
 
 ## Decision
@@ -56,6 +56,21 @@ provider. With real separation the first chunk's separation time is added; it is
 (no GPU; decision 0023), so the under-30-s target for a new upload with the `fast` preset is
 **not demonstrated**. What is demonstrated is that everything after separation costs 1.5 s for the
 first 8 s chunk.
+
+## What v3 is judged by (targets, set before the Phase 6 run, results in decision 0030)
+
+| Target | Value | Basis |
+|---|---|---|
+| Direct energy outside the front, against v2 | at least 3 times | the brief; capped by protected parts (0022) |
+| Direction map distance from the truth | at most 15 degrees | half of v2's 24.5, SPECULATIVE |
+| Per-part angular error | at most 20 degrees | near the localisation blur of non-individual heads (Wenzel et al. 1993; Middlebrooks 1999), SPECULATIVE |
+| Timbre deviation | at most 1.5 dB | decision 0014 |
+| Guard | pass | decision 0011 |
+| Render real-time factor, 30 s on 4 cores | under 0.2 | the streaming path needs to stay well ahead of playback |
+| Time to first sound | under 3 s after the first chunk is separated; under 30 s for a new upload with the fast preset | the brief |
+
+The angular-error target depends on the placement convention: the ground-truth songs are placed
+by the same published practice as the rules (decisions 0024 and 0030).
 
 ## Honest limits
 

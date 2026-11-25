@@ -633,3 +633,72 @@ is not known because no GPU run has happened (see Phase 3).
 
 Phase 6: benchmark of v1, v2 and v3, the blind test with an Atmos-style reference slot, the
 architecture and roadmap documents.
+
+## 2026-11-25: v3 Phase 6, the benchmark, the blind test and a Space that would not start
+
+### Done
+
+- Benchmarks of v1, v2 and v3 (decision 0030, README, `docs/benchmarks/`): the ground-truth
+  benchmark with true parts and with four stems through the model-free levels, and the v2-era
+  proxy table with v3 columns; the renderer is timed without separation.
+- The blind test takes a reference slot: a rendering of the same song that the listener loads
+  (an Atmos-style headphone rendering, for example), up to four letters in a rotating order,
+  all looped over the shared span, CSV with the reference file's name. 6 tests.
+- Architecture and roadmap for v3; decision 0027's targets section; README status and tables.
+- The Space: see below.
+
+### Measured
+
+Ground truth, two generated songs, 30 s (v2 / v3 true parts / v3 four stems): outside-front share
+14.1 / 45.2 / 30.1 percent (truth 31.5); map distance 24.5 / 12.3 / 6.6 degrees; per-part angular
+error 51.2 / 16.4 / 67.2 degrees; timbre deviation 1.73 / 0.78 / 0.64 dB. Proxies (five songs):
+v3 IACC 1.00 and lateral energy 0.000 against v2's 0.83 to 0.89 and 0.08 to 0.12. Renderer time
+for 30 s: v3 1.4 to 1.5 s, v2 4.4 to 11 s, v1 2.1 s. The phase 5 product: Lighthouse 0.98 light,
+0.99 dark, accessibility 1.00; emulated mid-range Android FCP 456 ms, LCP 732 ms.
+
+### What went wrong
+
+- **The Space was down for three pushes.** The whole-song push replaced `demo.launch` with
+  `uvicorn.run` around a mounted Gradio app; the Space went to RUNTIME_ERROR and the deploy
+  workflow, which only said RUNTIME_ERROR, failed on three pushes in a row and I did not notice
+  until Phase 6, which broke the rule that the Space keeps working after every push. The app starts on Python 3.10
+  here with the Space's Gradio, so I could not see the cause: ZeroGPU patches `demo.launch` and
+  that is my best explanation, not a confirmed one. Fixed forward: the app starts through
+  `demo.launch` again, with the v3 routes and CORS passed as FastAPI arguments, and the deploy
+  now prints the Space's own logs when it fails. The next deploy (c368014) reached RUNNING and
+  answered its API check; I could not call the v3 routes on the live Space from here (the
+  network policy blocks the host), so those are verified locally only.
+- The first v3 columns of the proxy table had a render time of 51 s for "v3 stems" because the
+  model-free cascade was inside the timer. Separation is now outside it.
+- The first v3 Lite row read IACC 1.0 and lateral energy 0, which looked like a bug. It is not:
+  the generated songs are centre-heavy and a dry source at 0 degrees is identical in both ears.
+  I checked by rendering one song directly (left and right differ by 0.14 at a peak of 0.6) and by
+  reading the placement plan before concluding.
+- A head-fallback test failed on this machine only, because running the Space here had downloaded
+  the other heads; it no longer depends on what is cached.
+- The push gate printed a green exit for the whole job because its last command was `cat`; I read
+  the log and found the failure. The gate's own exit code is what counts.
+
+### Not done
+
+- The neural cascade has never run (no GPU, weight hosts unreachable): no real separation
+  quality, no GPU seconds per minute, no real time to first sound.
+- v3 with four stems localises individual parts worse than v2 (67 against 51 degrees). It needs
+  the neural cascade or a better attribution of clusters to parts; I did not tune it to the metric.
+- No listener has used the blind test.
+- The catalogue pre-render dataset does not exist (no write token) and the Jamendo API has not
+  been called (no client id).
+- A real phone, head tracking and the SoundStage Separator's training.
+
+### Next, owner
+
+Set `JAMENDO_CLIENT_ID` and the Hugging Face write token; start the first GPU session on the
+Space with `SOUNDSTAGE_NEURAL=1` and record seconds per minute; run the blind test with listeners
+and publish the CSV with an interval; train the separator on Kaggle.
+
+Found while regenerating screenshots for Phase 6 (fixed in the same push): on a phone the Credits
+and theme controls were in the rail's footer, which only shows from 900 px, so the credits and the
+listening test were unreachable on a phone and the "credits" screenshot was the home screen again.
+Credits is now the fifth tab. The listening test also opened with the original alone after a
+streamed render, because the whole render was never decoded into a buffer; it is now decoded from
+the saved FLAC and the test needs two letters. The pickers had no styles. docs/screens has 52 images.

@@ -94,9 +94,8 @@ async function run(theme, size, tag) {
   await sleep(500);
   await shot(page, theme, `${tag}-library`);
 
-  await page.getByRole("button", { name: "Credits" }).first().click().catch(async () => {
-    await page.getByRole("button", { name: "Home" }).first().click();
-  });
+  await page.getByRole("button", { name: "Credits" }).first().click();
+  await page.getByRole("dialog", { name: "Credits and settings" }).waitFor();
   await sleep(300);
   await shot(page, theme, `${tag}-credits`);
 
