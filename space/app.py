@@ -347,7 +347,51 @@ def launch():
         app_kwargs={"routes": routes,
                     "middleware": [Middleware(CORSMiddleware, allow_origins=["*"],
                                               allow_methods=["GET", "POST"], allow_headers=["*"])]},
+        # Return instead of blocking, so the routes can be checked on the app that is actually
+        # serving. On the ZeroGPU Space the launcher is patched and the app it builds dropped the
+        # app_kwargs routes: /v3/health answered with the Gradio page, so the web app saw no
+        # server at all.
+        prevent_thread_lock=True,
     )
+    if ensure_routes(demo.app, routes):
+        ensure_cors(demo.app)
+    demo.block_thread()
+
+
+def ensure_cors(app) -> None:
+    """Wrap the running app in an open CORS layer when the launcher dropped ours.
+
+    Gradio's own CORS middleware only answers trusted origins (it sent no allow-origin header for
+    a Vercel origin in a local test), so the web app on another domain would be blocked even with
+    the routes in place. Middleware cannot be registered after start, but the built stack can be
+    wrapped: the outer layer answers preflights and sets the headers last, so its values win."""
+    from fastapi.middleware.cors import CORSMiddleware
+
+    if app.middleware_stack is None:
+        app.middleware_stack = app.build_middleware_stack()
+    app.middleware_stack = CORSMiddleware(app.middleware_stack, allow_origins=["*"],
+                                          allow_methods=["GET", "POST"], allow_headers=["*"],
+                                          expose_headers=["Content-Range", "Content-Length",
+                                                          "Accept-Ranges"])
+    print("v3 CORS: open layer added", flush=True)
+
+
+def ensure_routes(app, routes) -> int:
+    """Put every v3 route in front of the app's own routes if it is not served yet.
+
+    Gradio's app ends with catch-all routes for its own pages, so a route appended after them is
+    never reached; inserting at the front makes ours match first. Adding routes to a running
+    Starlette router is safe because the route list is read on every request. Middleware cannot
+    be added once the app has started, so CORS comes from Gradio's own middleware here, which the
+    web app already relies on for /gradio_api. Returns how many routes were added."""
+    have = {(getattr(r, "path", None), tuple(sorted(getattr(r, "methods", None) or ())))
+            for r in app.router.routes}
+    missing = [r for r in routes
+               if (r.path, tuple(sorted(getattr(r, "methods", None) or ()))) not in have]
+    app.router.routes[0:0] = missing
+    print(f"v3 routes: {len(routes) - len(missing)} already served, {len(missing)} added",
+          flush=True)
+    return len(missing)
 
 
 def fetch_assets() -> None:

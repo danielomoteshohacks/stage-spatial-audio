@@ -140,3 +140,23 @@ def test_the_combined_app_serves_gradio_and_the_v3_routes(app):
     r = client.options("/v3/health", headers={"Origin": "https://soundstage-phi.vercel.app",
                                               "Access-Control-Request-Method": "GET"})
     assert r.headers.get("access-control-allow-origin") in ("*", "https://soundstage-phi.vercel.app")
+
+
+def test_ensure_routes_puts_missing_v3_routes_in_front(app):
+    """The ZeroGPU launcher dropped the app_kwargs routes; ensure_routes must restore them so
+    they match before Gradio's own catch-all pages."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    served = FastAPI()
+
+    @served.get("/{rest:path}")
+    def catch_all(rest: str) -> dict:
+        return {"page": "gradio"}
+
+    routes = [route for r in app._routers() for route in r.routes]
+    added = app.ensure_routes(served, routes)
+    assert added == len(routes)
+    assert app.ensure_routes(served, routes) == 0  # idempotent
+    body = TestClient(served).get("/v3/health").json()
+    assert body["engine"] == "soundstage-v3"
