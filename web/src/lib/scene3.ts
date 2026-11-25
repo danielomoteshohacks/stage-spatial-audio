@@ -4,7 +4,7 @@
 // where the renderer uses a raised cosine, which does not matter at the size of a dot.
 
 export interface PlanFeed {
-  ch: "L" | "R" | "M";
+  ch: "L" | "R" | "M" | "C" | "Ls" | "Rs";
   az: number;
   el: number;
   weight?: number;
@@ -115,7 +115,7 @@ export function placeObjects(plan: Plan3, t: number): Placed[] {
       dEl += easedPath(ev.el, t);
     }
     const feeds = o.feeds.map((f) => {
-      const az = f.az * kAz + (f.az >= 0 || o.mode !== "pair" ? dAz : -dAz);
+      const az = f.az * kAz + (f.az >= 0 || (o.mode !== "pair" && o.mode !== "upmix") ? dAz : -dAz);
       return { az: ((az + 180 + 360) % 360) - 180, el: Math.min(80, Math.max(-10, f.el * kEl + dEl)) };
     });
     const az = feeds.reduce((s, f) => s + f.az, 0) / feeds.length;

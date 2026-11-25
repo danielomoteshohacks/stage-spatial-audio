@@ -185,6 +185,7 @@
           "enum": [
             "mono",
             "pair",
+            "upmix",
             "side",
             "ring"
           ]
@@ -228,7 +229,10 @@
                 "enum": [
                   "L",
                   "R",
-                  "M"
+                  "M",
+                  "C",
+                  "Ls",
+                  "Rs"
                 ]
               },
               "az": {

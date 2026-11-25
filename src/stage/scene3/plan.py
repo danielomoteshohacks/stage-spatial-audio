@@ -52,7 +52,8 @@ def infer_role(leaf: str) -> str:
     """The placement role of a leaf from its name, for leaves the cascade did not label."""
     n = leaf.lower()
     table = (("lead", "lead_vocal"), ("backing", "backing_vocal"), ("kick", "kick"),
-             ("snare", "snare"), ("bass", "bass"), ("hat", "cymbals"), ("cymbal", "cymbals"),
+             ("snare", "snare"), ("drum", "drums"), ("bass", "bass"), ("hat", "cymbals"),
+             ("cymbal", "cymbals"),
              ("tom", "toms"), ("guitar", "guitar"), ("piano", "keys"), ("keys", "keys"),
              ("pad", "pad"), ("fx", "fx"), ("vocal", "lead_vocal"))
     for key, role in table:
@@ -131,7 +132,7 @@ def object_paths(obj: dict[str, Any], plan: dict[str, Any], times: NDArray, open
         az = f["az"] * scale_az
         # An event's azimuth offset is mirrored for the feed on the other side, so a pair sweeps
         # together and keeps its width.
-        az = az + (d_az if f["az"] >= 0 else -d_az if obj["mode"] == "pair" else d_az)
+        az = az + (d_az if f["az"] >= 0 else -d_az if obj["mode"] in ("pair", "upmix") else d_az)
         el = f["el"] * scale_el + d_el
         out.append(((az + 180.0) % 360.0 - 180.0, np.clip(el, -10.0, MAX_EL)))
     return out
@@ -169,9 +170,21 @@ def build_plan_v3(analysis: SongAnalysis, leaves: dict[str, NDArray], sample_rat
         o = place(name, role, cfg, g3, character)
         o.update({"name": name, "leaf": name, "role": role, "kind": "object"})
         a = o["az"]
+        # Decision 0031: never collapse a part to mono, never feed one part's centre to two
+        # far-apart sources. A pair becomes an upmix (centre in front, each side out at +/-az);
+        # a mono role with a side width keeps its own stereo width around its position.
         if o["mode"] == "pair":
-            o["feeds"] = [{"ch": "L", "az": abs(a), "el": o["el"]},
-                          {"ch": "R", "az": -abs(a), "el": o["el"]}]
+            o["mode"] = "upmix"
+            o["feeds"] = [{"ch": "C", "az": 0.0, "el": o["el"]},
+                          {"ch": "Ls", "az": abs(a), "el": o["el"]},
+                          {"ch": "Rs", "az": -abs(a), "el": o["el"]}]
+        elif o["mode"] == "mono" and o.get("side_w"):
+            w = float(o["side_w"])
+            o["mode"] = "upmix"
+            o["spread"] = round(2.0 * w, 1)
+            o["feeds"] = [{"ch": "C", "az": a, "el": o["el"]},
+                          {"ch": "Ls", "az": a + w, "el": o["el"]},
+                          {"ch": "Rs", "az": a - w, "el": o["el"]}]
         else:
             o["feeds"] = [{"ch": "M", "az": a, "el": o["el"]}]
         o["events"] = [e for e in events if e["role"] == role or (
@@ -184,6 +197,13 @@ def build_plan_v3(analysis: SongAnalysis, leaves: dict[str, NDArray], sample_rat
         e = np.sum(np.asarray(x, dtype=np.float64) ** 2, axis=1) + 1e-20
         o["ch_share"] = {"L": round(float(e[0] / e.sum()), 4), "R": round(float(e[1] / e.sum()), 4),
                          "M": 1.0}
+        if o["mode"] == "upmix":
+            from stage.spatial.upmix import centre_sides
+
+            parts = centre_sides(np.asarray(x), sample_rate)
+            ep = {k: float(np.sum(np.asarray(v, dtype=np.float64) ** 2)) for k, v in parts.items()}
+            tot = sum(ep.values()) + 1e-20
+            o["ch_share"].update({k: round(v / tot, 4) for k, v in ep.items()})
         objects.append(o)
     ret_gain = float(g3.get("return", 1.0)) * CHARACTER_STAGE[character][2]
     ret_cfg = cfg["returns"]

@@ -1,5 +1,5 @@
 {
-  "_about": "Default placement of every leaf the separation cascade can produce, by role (decision 0024). Azimuth in degrees, positive to the LEFT (SOFA), elevation up, distance in metres from the listener. mode: mono (one point source from the mid signal), pair (two sources at +/- az, driven by the left and right channels), side (one point source on the side named in the leaf, e.g. guitar_left at +az). protected objects never move. breathes: the pair opens in loud sections and closes in quiet ones. Genre files in configs/templates/*.json carry a `v3` block that scales these.",
+  "_about": "Default placement of every leaf the separation cascade can produce, by role (decision 0024). Azimuth in degrees, positive to the LEFT (SOFA), elevation up, distance in metres from the listener. mode: mono (one point source from the mid signal), pair (two sources at +/- az, driven by the left and right channels), side (one point source on the side named in the leaf, e.g. guitar_left at +az). protected objects never move. breathes: the pair opens in loud sections and closes in quiet ones. Genre files in configs/templates/*.json carry a `v3` block that scales these. Since decision 0031 a pair is rendered as an upmix: the part's centre (content common to both channels) at the front of the object and each side out at +/-az, so nothing is collapsed to mono and nothing is a phantom between two far-apart sources; a mono role with side_w keeps its own width the same way (its sides at +/-side_w).",
   "roles": {
     "lead_vocal": {
       "mode": "mono",
@@ -9,7 +9,8 @@
       "protected": true,
       "breathes": false,
       "gain_db": 0,
-      "why": "Front centre, raised 7 degrees so it leaves the head, close and dry. Engineers keep the lead in front (Clearmountain: vocal first, rhythm section built around it) and Giles Martin avoids a hard-centre vocal so it sits in space."
+      "why": "Front centre, raised 7 degrees so it leaves the head, close and dry. Engineers keep the lead in front (Clearmountain: vocal first, rhythm section built around it) and Giles Martin avoids a hard-centre vocal so it sits in space.",
+      "side_w": 35
     },
     "backing_vocal": {
       "mode": "pair",
@@ -29,7 +30,8 @@
       "protected": true,
       "breathes": false,
       "gain_db": 0,
-      "why": "Front and anchored: kick, snare, bass and lead vocal stay front and centre."
+      "why": "Front and anchored: kick, snare, bass and lead vocal stay front and centre.",
+      "side_w": 20
     },
     "snare": {
       "mode": "mono",
@@ -39,7 +41,18 @@
       "protected": true,
       "breathes": false,
       "gain_db": 0,
-      "why": "As the kick."
+      "why": "As the kick.",
+      "side_w": 25
+    },
+    "drums": {
+      "mode": "pair",
+      "az": 70,
+      "el": 10,
+      "dist": 1.6,
+      "protected": true,
+      "breathes": false,
+      "gain_db": 0,
+      "why": "A whole drum kit from four-stem separation. Its centre (kick, snare) stays in front; its sides (overheads, hats, panned toms) open to +/-70 degrees and a little up, as drums sit around a listener in immersive music mixes. Protected: a whole kit never moves."
     },
     "bass": {
       "mode": "mono",
@@ -49,7 +62,8 @@
       "protected": true,
       "breathes": false,
       "gain_db": 0,
-      "why": "Centred and close; below the crossover the original passes through untouched."
+      "why": "Centred and close; below the crossover the original passes through untouched.",
+      "side_w": 20
     },
     "cymbals": {
       "mode": "pair",

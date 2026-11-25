@@ -53,6 +53,7 @@ from stage.scene3.plan import object_paths
 from stage.spatial.hrtf import BASE_DELAY, HrtfSet, get_hrtf
 from stage.spatial.neutral import timbre_filter
 from stage.spatial.room import Brir, brir, get_space
+from stage.spatial.upmix import apply_width, centre_sides, width_filter
 
 #: Largest boost of the directional bands, in dB (both ears alike).
 DIRECTIONAL_MAX_DB = 2.0
@@ -247,11 +248,15 @@ def render_v3(audio: NDArray, sample_rate: int, plan: dict[str, Any],
         # leaf first (15 filterings).
         high = np.asarray(leaves[obj["leaf"]], dtype=np.float32)
         mono = _mono(high) if any(f["ch"] == "M" for f in obj["feeds"]) else None
+        # Centre and sides of the part (decision 0031), computed once per object.
+        parts = (centre_sides(high, sr) if any(f["ch"] in ("C", "Ls", "Rs") for f in obj["feeds"])
+                 else None)
         dynamic = bool(obj.get("events")) or bool(obj.get("breathes"))
         paths = object_paths(obj, plan, block_times, openness) if dynamic else None
         for i, f in enumerate(obj["feeds"]):
-            sig = (gain * (mono if f["ch"] == "M" else high[0 if f["ch"] == "L" else 1])
-                   ).astype(np.float32)
+            src_sig = (mono if f["ch"] == "M" else parts[f["ch"]] if f["ch"] in ("C", "Ls", "Rs")
+                       else high[0 if f["ch"] == "L" else 1])
+            sig = (gain * src_sig).astype(np.float32)
             if dynamic and (np.ptp(paths[i][0]) > 0.5 or np.ptp(paths[i][1]) > 0.5):
                 az_b, el_b = paths[i]
                 y = render_path(sig, az_b, el_b, dist, hs, directional_db).astype(np.float32)
@@ -302,6 +307,12 @@ def render_v3(audio: NDArray, sample_rate: int, plan: dict[str, Any],
         total = fast_split(total, sr, crossover)[1]
     t = tick("convolve", t)
 
+    # Width (decision 0031): never narrower than the record. The side channel is lifted per band
+    # before the timbre match, which then sees (and keeps) the final balance.
+    hw, width = width_filter(high_mix, total, sr)
+    total = apply_width(total, hw)
+    for k in objects_out:
+        objects_out[k] = apply_width(objects_out[k], hw)
     # Neutrality: one timbre filter and one gain for the whole upper band and every object stem.
     h, timbre = timbre_filter(high_mix, total, sr)
     h32 = np.asarray(h, dtype=np.float32)[np.newaxis]
@@ -318,7 +329,7 @@ def render_v3(audio: NDArray, sample_rate: int, plan: dict[str, Any],
     return SceneResult(binaural=(low + upper_m).astype(np.float32), objects=objects_out,
                        bed=bed.data, info={
         "engine": "v3-objects", "hrtf": hs.name, "head": head, "space": space,
-        "crossover_hz": crossover, "timbre_match": timbre, "objects": names,
+        "crossover_hz": crossover, "timbre_match": timbre, "width_match": width, "objects": names,
         "moving_sources": moving, "directional_db": directional_db, "late_field": False,
         "render_s": round(time.perf_counter() - t_start, 3), "stage_s": {
             k: round(v, 3) for k, v in tm.items()}})
