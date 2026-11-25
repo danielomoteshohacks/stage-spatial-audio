@@ -1,0 +1,88 @@
+name: Live check
+
+# Plays one catalogue song through the live Space the way the web app does: health, shelves, the
+# original audio through the server, then a whole-song job whose first streamed segment must be
+# real audio. A render uses the GPU quota of the HF_TOKEN's account, so this runs by hand only.
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "Catalogue track id (empty: the first song on the Made for spatial shelf)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Play one song through the live Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+          TRACK: ${{ inputs.track }}
+        run: |
+          python3 - <<'PY'
+          import json, os, time, urllib.parse, urllib.request
+
+          host = "https://" + os.environ["HF_SPACE"].replace("/", "-").replace("_", "-").lower() + ".hf.space"
+          auth = {"Authorization": f"Bearer {os.environ['HF_TOKEN']}"}
+          origin = {"Origin": "https://soundstage-phi.vercel.app"}
+
+          def get(path, headers=None, timeout=60):
+              req = urllib.request.Request(host + path, headers={**auth, **origin, **(headers or {})})
+              return urllib.request.urlopen(req, timeout=timeout)
+
+          t0 = time.time()
+          health = json.load(get("/v3/health"))
+          print("health:", health)
+          shelves = json.load(get("/catalog/shelves"))["shelves"]
+          print("shelves:", len(shelves), "tracks:", sum(len(s["tracks"]) for s in shelves))
+          spatial = next(s for s in shelves if s["key"] == "made_for_spatial")
+          tid = os.environ.get("TRACK") or spatial["tracks"][0]["id"]
+          print("track:", tid)
+          quoted = urllib.parse.quote(tid, safe=":")
+          with get(f"/audio/{quoted}", {"Range": "bytes=0-65535"}) as r:
+              head = r.read()
+              print("original:", r.status, r.headers.get("content-type"), len(head), "bytes")
+              assert r.status in (200, 206) and len(head) > 1000
+
+          body = json.dumps({"data": [tid, json.dumps({"preset": "fast", "fmt": "opus"})]}).encode()
+          req = urllib.request.Request(host + "/gradio_api/call/v3_catalog", data=body, method="POST",
+                                       headers={**auth, "Content-Type": "application/json"})
+          event = json.load(urllib.request.urlopen(req, timeout=60))["event_id"]
+          stream = urllib.request.urlopen(urllib.request.Request(
+              f"{host}/gradio_api/call/v3_catalog/{event}", headers=auth), timeout=1500)
+          first_seg, last, kind = None, None, None
+          for raw in stream:
+              line = raw.decode("utf-8", "replace").strip()
+              if line.startswith("event:"):
+                  kind = line.split(":", 1)[1].strip()
+                  if kind == "error":
+                      print("the server reported an error event")
+              if not line.startswith("data:") or kind not in ("generating", "complete"):
+                  continue
+              arr = json.loads(line[5:])
+              if not arr or not isinstance(arr[0], str):
+                  continue
+              last = json.loads(arr[0])
+              segs = last.get("segments") or []
+              if segs and first_seg is None:
+                  first_seg = segs[0]
+                  print(f"first segment after {time.time() - t0:.1f} s:", first_seg)
+              if last.get("done"):
+                  break
+          assert last is not None, "no job state came back"
+          print("final:", {k: last.get(k) for k in ("status", "error", "done", "separator", "duration_s")})
+          assert not last.get("error"), last.get("error")
+          assert first_seg, "no segment was streamed"
+          name = first_seg["file"] if isinstance(first_seg, dict) else first_seg
+          with get(f"/v3/jobs/{last['id']}/seg/{name}") as r:
+              seg = r.read()
+          print("segment bytes:", len(seg), seg[:4])
+          assert len(seg) > 1000
+          print(f"whole job: {time.time() - t0:.1f} s")
+          PY
