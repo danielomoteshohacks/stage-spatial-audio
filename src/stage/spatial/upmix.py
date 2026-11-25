@@ -77,6 +77,7 @@ def width_ratio(x: NDArray) -> float:
 #: The width matcher may raise the side signal by at most this much in any band. More would make
 #: lateral sources jump to the ears instead of opening the stage.
 WIDTH_MAX_DB = 9.0
+WIDTH_MAX_CUT_DB = 6.0
 
 
 def width_filter(original: NDArray, render: NDArray, sample_rate: int
@@ -88,8 +89,8 @@ def width_filter(original: NDArray, render: NDArray, sample_rate: int
     correlated between the ears than headphone stereo, where a hard-panned part is in one ear
     only. Measured on the generated songs: side-to-mid energy 0.27 in the record and 0.06 in the
     v3 render; the centre/side upmix took it to 0.12. This lifts the render's side (L - R) in
-    each band by the dB that brings its side-to-mid ratio to the record's, only upwards and at
-    most WIDTH_MAX_DB, smoothly across bands. Directions stay where the head filters put them;
+    each band by the dB that brings its side-to-mid ratio to the record's (at most WIDTH_MAX_DB
+    up, WIDTH_MAX_CUT_DB down), smoothly across bands. Directions stay where the head filters put them;
     what changes is how far apart the two ears' signals are, which is the width a listener
     compares against the original."""
     from stage.guard.checks import third_octave_bands
@@ -107,7 +108,10 @@ def width_filter(original: NDArray, render: NDArray, sample_rate: int
     valid = (om > om.max() * 1e-6) & (rm > 0) & (rs > 0)
     want = np.zeros(centres.size)
     want[valid] = 10.0 * np.log10((os_[valid] / om[valid]) / (rs[valid] / rm[valid]))
-    gain_db = np.clip(want, 0.0, WIDTH_MAX_DB)
+    # Up to the record's width, and down to it too when the head (an analytic head without the
+    # measured pack, or a source near the ears) makes a band much wider than the record: a stage
+    # twice as wide as the mix sounds hollow, not bigger.
+    gain_db = np.clip(want, -WIDTH_MAX_CUT_DB, WIDTH_MAX_DB)
     gain_db = np.convolve(np.pad(gain_db, 1, mode="edge"), np.ones(3) / 3.0, mode="valid")
     return correction_filter(centres, gain_db, sample_rate), {
         "max_side_lift_db": round(float(gain_db.max()), 2),
