@@ -309,18 +309,46 @@ def v3_catalog(track_id, options_json=""):
         yield json.dumps(j.snapshot())
 
 
+def _routers():
+    return [_router, create_calibration_router(),
+            create_catalog_router(CATALOGUE, STORE, background=False)]
+
+
 def build_app():
-    """The Gradio demo plus the v3 HTTP routes, with CORS so the web app can fetch segments."""
+    """The Gradio demo mounted inside a FastAPI app that carries the v3 routes and CORS.
+
+    Used by the tests and for running without Gradio's own launcher. On a Hugging Face Space the
+    app starts through `demo.launch` instead (see `launch`): ZeroGPU patches that entry point, and
+    the first deploy of the mounted form crashed on start (docs/log.md, v3 Phase 6)."""
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
     api = FastAPI(title="SoundStage backend")
     api.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"],
                        allow_headers=["*"])
-    api.include_router(_router)
-    api.include_router(create_calibration_router())
-    api.include_router(create_catalog_router(CATALOGUE, STORE, background=False))
+    for r in _routers():
+        api.include_router(r)
     return gr.mount_gradio_app(api, demo, path="/", allowed_paths=[str(WORK_ROOT)])
+
+
+def launch():
+    """Start through Gradio's own launcher, with the v3 routes and CORS given to its FastAPI app.
+
+    `routes` and `middleware` are FastAPI constructor arguments, which `app_kwargs` passes
+    through, so no route is added after the app has started."""
+    from fastapi.middleware import Middleware
+    from fastapi.middleware.cors import CORSMiddleware
+
+    routes = [route for r in _routers() for route in r.routes]
+    demo.launch(
+        server_name=os.getenv("GRADIO_SERVER_NAME", "0.0.0.0"),
+        server_port=int(os.getenv("GRADIO_SERVER_PORT", "7860")),
+        allowed_paths=[str(WORK_ROOT)], show_error=True,
+        app_kwargs={"routes": routes,
+                    "middleware": [Middleware(CORSMiddleware, allow_origins=["*"],
+                                              allow_methods=["GET", "POST"], allow_headers=["*"])]},
+    )
+
 
 def fetch_assets() -> None:
     """Download the measured HRTF pack once, on Hugging Face's servers, in the background.
@@ -363,7 +391,4 @@ if __name__ == "__main__":
     start_sweeper()
     fetch_assets()
     CATALOGUE.refresh_in_background()
-    import uvicorn
-
-    uvicorn.run(build_app(), host=os.getenv("GRADIO_SERVER_NAME", "0.0.0.0"),
-                port=int(os.getenv("GRADIO_SERVER_PORT", "7860")))
+    launch()

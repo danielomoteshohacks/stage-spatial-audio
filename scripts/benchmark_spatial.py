@@ -8,6 +8,10 @@ rendered by:
 
 * v1 Lite: the v1 `max` profile, RMS-matched as the v1 pipeline does;
 * v2 Lite: the v2 scene from the whole mix (no separation), studio, Pop template;
+* v3 Lite: the v3 object renderer on the model-free leaves (stage.stream.job.lite_leaves), the
+  decomposition the service uses when no separator is available;
+* v3 stems: the v3 object renderer on the cascade's model-free levels given the song's true four
+  stems (stage.separation.cascade.dsp), the same input v2 stems gets;
 * v2 stems: the v2 scene from the song's true stems (the separator is benchmarked on its own by
   scripts/eval_separation.py), Pop template, motion depth 0.5, in the studio and in the living
   room (the default space).
@@ -144,7 +148,34 @@ def metrics(orig: np.ndarray, y: np.ndarray, sr: int, seconds: float) -> dict:
     }
 
 
-CONFIGS = ("v1 Lite", "v2 Lite", "v2 stems", "v2 stems, living room")
+CONFIGS = ("v1 Lite", "v2 Lite", "v2 stems", "v2 stems, living room", "v3 Lite", "v3 stems")
+
+
+def v3_inputs(name: str, mix: np.ndarray, sr: int, stems: dict, analysis_mix, analysis_stems):
+    """The leaves, their roles and the analysis for a v3 config. Separation is not part of the
+    renderer's time, so this runs before the clock starts (its own cost is in decision 0023)."""
+    from stage.separation.cascade.dsp import dsp_cascade
+    from stage.stream.job import lite_leaves
+
+    if name == "v3 Lite":
+        leaves, _, info = lite_leaves(mix, sr)
+        return leaves, info["roles"], analysis_mix
+    casc = dsp_cascade(mix, sr, stems)
+    return casc.leaves, casc.roles, analysis_stems
+
+
+def render_v3_config(mix: np.ndarray, sr: int, inputs) -> np.ndarray:
+    from stage.scene3.plan import build_plan_v3
+    from stage.scene3.render import render_v3
+
+    leaves, roles, analysis = inputs
+    plan = build_plan_v3(analysis, leaves, sr, track_id="b", genre="pop", motion_depth=0.5,
+                         roles=roles)
+    plan["analysis_sample_rate"] = sr
+    return render_v3(mix, sr, plan, leaves, want_objects=False).binaural
+
+
+v3_cache: dict = {}
 
 
 def render(name: str, mix: np.ndarray, sr: int, stems: dict, analysis_mix, analysis_stems
@@ -155,6 +186,8 @@ def render(name: str, mix: np.ndarray, sr: int, stems: dict, analysis_mix, analy
         plan = build_plan(analysis_mix, track_id="b", mode="lite", genre="pop", space="studio",
                           motion_depth=0.5)
         return render_scene(mix, sr, plan, None).binaural
+    if name.startswith("v3"):
+        return render_v3_config(mix, sr, v3_cache[name])
     space = "living_room" if "living room" in name else "studio"
     plan = build_plan(analysis_stems, track_id="b", mode="stems", genre="pop", space=space,
                       motion_depth=0.5)
@@ -166,6 +199,7 @@ def main() -> None:
     ap.add_argument("--songs", type=int, default=5)
     ap.add_argument("--seconds", type=float, default=30.0)
     ap.add_argument("--out", default="benchmark_spatial.json")
+    ap.add_argument("--configs", default=",".join(CONFIGS), help="comma-separated subset")
     args = ap.parse_args()
     rows = []
     for seed, tempo in SONGS[: args.songs]:
@@ -177,7 +211,9 @@ def main() -> None:
         analysis_mix = analyse_song(mix, sr)
         analysis_stems = analyse_song(mix, sr, stems)
 
-        for name in CONFIGS:
+        for name in args.configs.split(","):
+            if name.startswith("v3"):
+                v3_cache[name] = v3_inputs(name, mix, sr, stems, analysis_mix, analysis_stems)
             job = (name, mix, sr, stems, analysis_mix, analysis_stems)
             if seed == SONGS[0][0] and name != "v1 Lite":
                 render(*job)  # warm the room caches, so the time is the render, not the room build
@@ -193,7 +229,7 @@ def main() -> None:
     keys = ["iacc", "ild_spread_db", "itd_spread_us", "drr_estimate_db", "lateral_energy",
             "coherence_mean", "coherence_std", "timbre_dev_db", "artifact_flags", "low_end_corr",
             "loudness_diff_lu", "render_s"]
-    configs = CONFIGS
+    configs = args.configs.split(",")
     print("\n| Metric | Better | " + " | ".join(configs) + " |")
     print("|---|---|" + "---|" * len(configs))
     better = {"iacc": "lower", "ild_spread_db": "higher", "itd_spread_us": "higher",

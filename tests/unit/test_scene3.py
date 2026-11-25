@@ -1,5 +1,7 @@
 """The v3 object scene: placement from data, events, paths, and the renderer's invariants."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -266,10 +268,14 @@ def test_head_selection_picks_the_head_with_the_smaller_error_and_fewer_confusio
 
 
 def test_an_unavailable_head_falls_back_to_the_default_pack(monkeypatch):
+    from stage.spatial import heads
     from stage.spatial.hrtf import get_hrtf
 
+    # Whatever heads this machine has downloaded, pretend this one is absent: the test is about
+    # the fallback, and a laptop that has run the Space has every head cached.
+    monkeypatch.setattr(heads, "pack_path", lambda head: Path("/nonexistent") / f"{head}.npz")
     a = get_hrtf(44100)
-    b = get_hrtf(44100, head="H7")  # not on this machine
+    b = get_hrtf(44100, head="H7")
     assert a is b
 
 

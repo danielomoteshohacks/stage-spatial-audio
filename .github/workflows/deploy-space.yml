@@ -107,3 +107,30 @@ jobs:
           assert "space:studio" in profiles, profiles
           print(f"{host} is live with the v2 engine")
           PY
+      # A Space that crashes on start used to leave only "RUNTIME_ERROR" here (three pushes in a
+      # row, docs/log.md v3 Phase 6). Print what the Space itself says, so the cause is in this log.
+      - name: Show the Space's own logs after a failed deploy
+        if: failure() && steps.config.outputs.enabled == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          python - <<'PY'
+          import os, time, urllib.request
+
+          repo = os.environ["HF_SPACE"]
+          for kind in ("run", "build"):
+              print(f"----- {kind} log of {repo} (last lines) -----", flush=True)
+              req = urllib.request.Request(f"https://api.hf.space/v1/{repo}/logs/{kind}",
+                                           headers={"Authorization": f"Bearer {os.environ['HF_TOKEN']}"})
+              lines, t0 = [], time.time()
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as resp:
+                      for raw in resp:
+                          lines.append(raw.decode("utf-8", "replace").rstrip())
+                          if time.time() - t0 > 20:
+                              break
+              except Exception as exc:  # the stream ends by timeout once it has caught up
+                  print("(log stream ended:", type(exc).__name__, ")")
+              print("\n".join(lines[-80:]))
+          PY

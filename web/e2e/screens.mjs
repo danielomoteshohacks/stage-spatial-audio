@@ -99,6 +99,12 @@ async function run(theme, size, tag) {
   });
   await sleep(300);
   await shot(page, theme, `${tag}-credits`);
+
+  // The blind test, with the reference slot. The song played above is still in memory.
+  await page.getByRole("button", { name: "Listening test" }).click();
+  await page.waitForSelector(".test");
+  await sleep(300);
+  await shot(page, theme, `${tag}-listening-test`);
   await ctx.close();
 }
 

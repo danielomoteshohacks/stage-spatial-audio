@@ -54,3 +54,24 @@ in phases, each pushed to main green and recorded in [`log.md`](log.md):
 
 Next: train the separator on Kaggle, run the blind test with listeners, check on a Galaxy S21 FE,
 then decide on head tracking.
+
+## v3 rebuild (November 2026)
+
+The owner's listening of v2 (the stereo pushed backwards, little outside the head) started a second
+rebuild, again in phases pushed green and recorded in [`log.md`](log.md):
+
+| Phase | What | Status |
+|---|---|---|
+| 0 | Diagnose v2 with numbers; ground-truth object songs | done |
+| 1 | Separation cascade, post-processing, quality score, evaluation | model-free levels done and measured; neural levels coded, never run (no GPU or weight host reachable) |
+| 2 | Object renderer: dry sources, placement templates, events, HRTF heads | done; head choice by calibration game shipped |
+| 3 | Whole songs in chunks, streamed, Opus delivery | done; real time to first sound with the neural cascade not measured |
+| 4 | Streaming catalogue, 60+ verified tracks, legal page | 115 tracks verified; Jamendo API and pre-rendered dataset need the owner's keys |
+| 5 | Product: light and dark, shelves, player, calibration | done; emulated phone profile, not a real phone |
+| 6 | Benchmark v1/v2/v3, blind test with a reference slot, documents | done; listening tests pending |
+
+Next, in order: (1) run the cascade on the Space's GPU and record seconds per minute and time to
+first sound; (2) set `JAMENDO_CLIENT_ID` and the Hugging Face write token, run the catalogue
+workflow, and check Jamendo in a browser; (3) run the blind test with listeners, including the
+reference slot, and publish the CSV with an interval; (4) train the SoundStage Separator on Kaggle;
+(5) check on a real phone; (6) only then consider head tracking.

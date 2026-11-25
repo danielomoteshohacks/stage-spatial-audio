@@ -1,6 +1,14 @@
-// A blind A/B/C listening test: the conditions play in a random order under neutral letters,
-// loudness-matched, and the listener ranks them and picks the one "most outside my head" and
-// the one "most natural". Trials are kept in this browser and exported as CSV; nothing is sent.
+// A blind listening test: the conditions (the original, the v3 render and, if the listener loads
+// one, a reference they obtained themselves) play in a random order under neutral letters,
+// loudness-matched, and the listener ranks them and picks the one "most outside my head" and the
+// one "most natural". Trials are kept in this browser and exported as CSV; nothing is sent.
+//
+// The reference slot exists because the comparison that matters is against what listeners already
+// know. SoundStage does not ship, make or imitate any commercial format: the listener loads a
+// binaural rendering of the same song from wherever they have it (an Atmos-style headphone
+// rendering of a track they own or may use), and it is judged blind like the others. The file
+// never leaves the browser, and its name is recorded in the CSV only so the listener can tell
+// their own trials apart.
 
 export interface Condition {
   id: string; // e.g. "original", "v2", "v1" (hidden from the listener until export)
@@ -17,6 +25,25 @@ export interface Trial {
   outside: string;
   natural: string;
   gains_db: Record<string, number>;
+  /** Name of the file loaded into the reference slot, if there was one. */
+  reference_file?: string;
+}
+
+export const MAX_CONDITIONS = 4;
+export const LETTERS = ["A", "B", "C", "D"];
+
+/** Seconds that all buffers can loop over together, so the letters stay time-locked. */
+export function commonLoopSeconds(buffers: { duration: number }[]): number {
+  return buffers.length ? Math.min(...buffers.map((b) => b.duration)) : 0;
+}
+
+/** Order in which trials are presented the first time: reproducible only by the listener's
+ * own CSV, never from a seed. A new array each call. */
+export function balancedOrders(ids: string[]): string[][] {
+  // Every cyclic rotation of a shuffle: each condition appears at each letter once over n trials,
+  // which cancels position bias without making the next order predictable from the last one.
+  const base = shuffle(ids);
+  return base.map((_, k) => base.map((__, i) => base[(i + k) % base.length]));
 }
 
 /** Fisher-Yates with crypto randomness, so the order cannot be guessed from a seed. */
@@ -57,10 +84,10 @@ export function matchGains(levels: Record<string, number>): Record<string, numbe
 }
 
 export function toCsv(trials: Trial[]): string {
-  const head = ["trial", "at", "track", "order_A", "order_B", "order_C", "rank_1", "rank_2", "rank_3", "most_outside_head", "most_natural", "gains_db"];
+  const head = ["trial", "at", "track", ...LETTERS.map((l) => `order_${l}`), ...LETTERS.map((_, i) => `rank_${i + 1}`), "most_outside_head", "most_natural", "reference_file", "gains_db"];
   const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replaceAll('"', '""')}"` : v);
   const rows = trials.map((t) =>
-    [String(t.trial), t.at, t.track, t.order[0] ?? "", t.order[1] ?? "", t.order[2] ?? "", t.ranking[0] ?? "", t.ranking[1] ?? "", t.ranking[2] ?? "", t.outside, t.natural,
+    [String(t.trial), t.at, t.track, ...LETTERS.map((_, i) => t.order[i] ?? ""), ...LETTERS.map((_, i) => t.ranking[i] ?? ""), t.outside, t.natural, t.reference_file ?? "",
       Object.entries(t.gains_db).map(([k, v]) => `${k}:${v.toFixed(2)}`).join(" ")].map(esc).join(","),
   );
   return [head.join(","), ...rows].join("\n") + "\n";
