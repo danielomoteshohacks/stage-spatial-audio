@@ -7,6 +7,7 @@
   import Create from "./components/Create.svelte";
   import Credits from "./components/Credits.svelte";
   import Home from "./components/Home.svelte";
+  import seedCatalogue from "./data/catalogue.json";
   import Library from "./components/Library.svelte";
   import MiniPlayer from "./components/MiniPlayer.svelte";
   import Sheet from "./components/Sheet.svelte";
@@ -30,7 +31,8 @@
 
   let backend = $state(loadBackendUrl());
   let status: "checking" | "online" | "offline" = $state("checking");
-  let shelves: Shelf[] = $state([]);
+  // Full from the first render (see loadSeedShelves), replaced by the server's shelves when it answers.
+  let shelves: Shelf[] = $state((seedCatalogue as { shelves: Shelf[] }).shelves);
   let formats: string[] = $state(["opus", "flac"]);
   let tab: Tab = $state("home");
   let browseGenre = $state("");
@@ -82,22 +84,16 @@
     return ctx;
   }
 
-  // The committed catalogue (public/catalogue.json, exported from the server's seed) fills Home and
-  // Browse straight away, so the app is never an empty page while the server wakes or if it is
-  // down. When the server answers, its own shelves replace these.
-  async function loadSeedShelves() {
-    if (shelves.length) return;
-    try {
-      const res = await fetch(`${import.meta.env.BASE_URL}catalogue.json`);
-      if (res.ok && !shelves.length) shelves = ((await res.json()) as { shelves: typeof shelves }).shelves;
-    } catch {
-      // Offline and not cached: the shelves stay empty and the status note explains why.
-    }
+  // The committed catalogue (src/data/catalogue.json, exported from the server's seed) is in the
+  // bundle, so Home and Browse are full on the first paint: nothing waits for the server and
+  // nothing jumps when it answers. When the server answers, its own shelves replace these.
+  function loadSeedShelves() {
+    if (!shelves.length) shelves = (seedCatalogue as { shelves: typeof shelves }).shelves;
   }
 
   async function check() {
     status = "checking";
-    void loadSeedShelves();
+    loadSeedShelves();
     // A sleeping Space takes up to a minute or two to wake, and answers the first requests slowly
     // or with an error, so one failed request is not "offline". Try for about two minutes.
     const waits = [0, 3000, 5000, 8000, 12000, 15000, 20000, 25000, 30000];

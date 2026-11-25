@@ -1,4 +1,4 @@
-"""Write the catalogue shelves into the web app (web/public/catalogue.json).
+"""Write the catalogue shelves into the web app (web/src/data/catalogue.json).
 
 The web app shows these shelves at once, before the server answers and when it is asleep or
 down, so Home and Browse are never empty. The server's /catalog/shelves stays the source of
@@ -15,7 +15,7 @@ from pathlib import Path
 
 from stage.catalogue.store import Catalogue, load_seed
 
-OUT = Path(__file__).resolve().parents[1] / "web" / "public" / "catalogue.json"
+OUT = Path(__file__).resolve().parents[1] / "web" / "src" / "data" / "catalogue.json"
 
 
 def web_catalogue() -> dict:
