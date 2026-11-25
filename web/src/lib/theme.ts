@@ -42,7 +42,7 @@ export function forcedTheme(search: string): Theme | null {
 }
 
 /** Colour of the browser's address bar for a theme. */
-export const THEME_COLOR: Record<Theme, string> = { light: "#faf8f5", dark: "#15161b" };
+export const THEME_COLOR: Record<Theme, string> = { light: "#f3f4f8", dark: "#0e0f1d" };
 
 export function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;

@@ -13,6 +13,8 @@
   import PlayButton from "./PlayButton.svelte";
   import Scrubber from "./Scrubber.svelte";
   import SpatialPill from "./SpatialPill.svelte";
+  import Orbit from "./Orbit.svelte";
+  import Logo from "./Logo.svelte";
 
   let {
     item,
@@ -70,7 +72,7 @@
     oncalibrate: () => void;
   } = $props();
 
-  let panel: "stage" | "queue" | "about" = $state("stage");
+  let panel: "queue" | "about" = $state("queue");
   const style = $derived(tintStyle(hashTint(item.artId ?? item.id)));
   const lic = $derived(item.track?.licence);
 </script>
@@ -80,7 +82,7 @@
     <button type="button" class="btn icon ghost" onclick={onclose} aria-label="Close the player">
       <Icon name="chevron-down" size={24} />
     </button>
-    <span class="eyebrow">Now playing</span>
+    <span class="mark"><Logo size={26} /></span>
     <button
       type="button"
       class="btn icon ghost"
@@ -92,7 +94,7 @@
   </header>
 
   <div class="hero">
-    <div class="art"><Art id={item.artId ?? item.id} src={item.artworkUrl} size={280} radius={28} label="Cover art" /></div>
+    <Orbit {plan} {side} {playing} {time} artId={item.artId ?? item.id} artworkUrl={item.artworkUrl} title={item.title} />
     <div class="title">
       <h1>{item.title}</h1>
       <p class="muted">{item.artist}</p>
@@ -101,7 +103,7 @@
 
   <SpatialPill {side} {spatialReady} progress={renderProgress} {buffering} onchange={onside} />
 
-  <div class="transport">
+  <div class="transport dock">
     <Scrubber {time} {duration} ready={readyUntil} {onseek} />
     <div class="controls">
       <button type="button" class="btn icon ghost" onclick={onprev} aria-label="Previous" disabled={index <= 0}>
@@ -123,7 +125,7 @@
   </div>
 
   <div class="tabs" role="tablist" aria-label="More about this track">
-    {#each [["stage", "Stage"], ["queue", "Queue"], ["about", "About"]] as [id, label] (id)}
+    {#each [["queue", "Up next"], ["about", "About this track"]] as [id, label] (id)}
       <button role="tab" type="button" aria-selected={panel === id} class="chip" onclick={() => (panel = id as typeof panel)}>
         {label}
       </button>
@@ -131,15 +133,7 @@
   </div>
 
   <div class="panel" role="tabpanel">
-    {#if panel === "stage"}
-      {#if plan}
-        {#await import("./StageView.svelte") then m}
-          <m.default {plan} {time} />
-        {/await}
-      {:else}
-        <p class="muted">The stage appears when the first part of the song has been placed.</p>
-      {/if}
-    {:else if panel === "queue"}
+    {#if panel === "queue"}
       <ol class="queue">
         {#each queue as q, i (q.id)}
           <li>
@@ -203,10 +197,18 @@
     gap: var(--gap-5);
     justify-items: center;
   }
-  .art :global(.art) {
-    width: min(280px, 72vw);
-    height: min(280px, 72vw);
-    box-shadow: var(--shadow-3);
+  .mark {
+    display: grid;
+    place-items: center;
+  }
+  /* The transport floats on a frosted dock over the player's colour. */
+  .dock {
+    padding: var(--gap-4) var(--gap-4) var(--gap-3);
+    border-radius: 28px;
+    background: var(--overlay);
+    backdrop-filter: blur(var(--blur)) saturate(1.4);
+    -webkit-backdrop-filter: blur(var(--blur)) saturate(1.4);
+    box-shadow: var(--shadow-2), inset 0 1px 0 var(--highlight), inset 0 0 0 1px var(--hairline);
   }
   .title {
     text-align: center;

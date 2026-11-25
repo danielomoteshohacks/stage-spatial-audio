@@ -37,7 +37,8 @@
     ["BS-RoFormer and Mel-Band RoFormer papers", "", "Lu, Wang, Kong and Hung; Wang, Lu and Won"],
     ["Azimuth discrimination (ADRess)", "", "Barry, Lawlor and Coyle, DAFx 2004"],
     ["SADIE II head-related transfer functions", "Apache-2.0", "The Audio Lab, University of York (Armstrong, Thresh, Murphy and Kearney 2018)"],
-    ["Instrument Sans and Instrument Serif", "SIL Open Font Licence 1.1", "Instrument"],
+    ["Instrument Sans", "SIL Open Font Licence 1.1", "Instrument"],
+    ["Bricolage Grotesque", "SIL Open Font Licence 1.1", "Mathieu Triay"],
   ];
 </script>
 

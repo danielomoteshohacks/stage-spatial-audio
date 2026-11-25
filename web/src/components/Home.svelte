@@ -9,6 +9,7 @@
   import Shelf from "./Shelf.svelte";
   import Art from "./Art.svelte";
   import Icon from "./Icon.svelte";
+  import Logo from "./Logo.svelte";
 
   let {
     recents,
@@ -46,7 +47,10 @@
   {/if}
 
   <header class="top">
-    <h1 class="hero">{hello}</h1>
+    <div class="hello">
+      <span class="brand"><Logo size={22} /> SoundStage</span>
+      <h1 class="hero">{hello}</h1>
+    </div>
     <span class="status" data-s={status} role="status">
       <span class="dot"></span>{status === "online" ? "Spatial ready" : status === "checking" ? "Waking the server" : "Originals only"}
     </span>
@@ -58,7 +62,7 @@
       <div class="feature-in">
         <Art id={featured.id} src={featured.artworkUrl} size={132} radius={18} eager label={`Cover of ${featured.title}`} />
         <div class="meta">
-          <span class="kicker">Made for spatial</span>
+          <span class="kicker">Today's spatial pick</span>
           <h2 class="ft">{featured.title}</h2>
           <span class="fa">{featured.artist}</span>
           <div class="actions">
@@ -141,6 +145,15 @@
   .hero {
     font-size: var(--text-hero);
   }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    margin-bottom: 4px;
+  }
   .status {
     display: inline-flex;
     align-items: center;
@@ -219,10 +232,8 @@
     min-width: 0;
   }
   .kicker {
-    font-size: var(--text-xs);
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-size: var(--text-sm);
+    font-weight: 600;
     opacity: 0.85;
   }
   .ft {

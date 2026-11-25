@@ -7,22 +7,22 @@
   color-scheme: light;
 
   /* Light: a warm white base, soft neutral cards. */
-  --bg: #faf8f5;
-  --bg-2: #f3f0eb;
+  --bg: #f3f4f8;
+  --bg-2: #eceef4;
   --surface: #ffffff;
-  --surface-2: #f6f3ee;
-  --surface-3: #ece8e1;
+  --surface-2: #f5f6fa;
+  --surface-3: #e6e8ef;
   --overlay: rgb(255 255 255 / 0.7);
   --overlay-strong: rgb(255 255 255 / 0.86);
-  --hairline: rgb(28 26 22 / 0.09);
-  --hairline-strong: rgb(28 26 22 / 0.16);
+  --hairline: rgb(20 22 43 / 0.08);
+  --hairline-strong: rgb(20 22 43 / 0.15);
   --highlight: rgb(255 255 255 / 0.9);
   --grain-opacity: 0.045;
 
   /* Text, three strengths; all at least 4.5:1 on --bg and --surface. */
-  --text: #1c1a16;
-  --text-2: #55504a;
-  --text-3: #6b655d;
+  --text: #14162b;
+  --text-2: #4b4f66;
+  --text-3: #5f6378;
 
   /* Two refined accents. Lagoon is "spatial", coral is "original". Both carry white text. */
   --lagoon: #07756a;
@@ -46,9 +46,9 @@
   --shadow-play: 0 2px 4px rgb(7 117 106 / 0.3), 0 10px 22px rgb(7 117 106 / 0.32),
     0 22px 40px rgb(7 117 106 / 0.22);
 
-  /* Type: Instrument Sans for the interface, Instrument Serif for editorial headings. */
+  /* Type: Instrument Sans for the interface, Bricolage Grotesque for headings. */
   --font-ui: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
-  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-display: "Bricolage Grotesque", "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-md: 1rem;
@@ -85,20 +85,20 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   /* Dark: deep charcoal, not black, with the same materials. */
-  --bg: #15161b;
-  --bg-2: #1a1b21;
-  --surface: #1f2128;
-  --surface-2: #262830;
-  --surface-3: #2e3039;
-  --overlay: rgb(31 33 40 / 0.66);
-  --overlay-strong: rgb(31 33 40 / 0.88);
+  --bg: #0e0f1d;
+  --bg-2: #131528;
+  --surface: #171a2f;
+  --surface-2: #1e2139;
+  --surface-3: #262a45;
+  --overlay: rgb(23 26 47 / 0.62);
+  --overlay-strong: rgb(23 26 47 / 0.88);
   --hairline: rgb(244 240 232 / 0.09);
   --hairline-strong: rgb(244 240 232 / 0.18);
   --highlight: rgb(255 255 255 / 0.1);
   --grain-opacity: 0.07;
-  --text: #f3efe8;
-  --text-2: #b9b3a8;
-  --text-3: #9a948a;
+  --text: #f1f2f8;
+  --text-2: #b3b6cc;
+  --text-3: #9599b2;
   --lagoon: #34d6c2;
   --lagoon-soft: rgb(52 214 194 / 0.16);
   --coral: #ff8a6d;
