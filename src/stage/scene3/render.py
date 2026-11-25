@@ -53,7 +53,7 @@ from stage.scene3.plan import object_paths
 from stage.spatial.hrtf import BASE_DELAY, HrtfSet, get_hrtf
 from stage.spatial.neutral import timbre_filter
 from stage.spatial.room import Brir, brir, get_space
-from stage.spatial.upmix import apply_width, centre_sides, width_filter
+from stage.spatial.upmix import apply_width, centre_sides, limit_peaks, width_filter
 
 #: Largest boost of the directional bands, in dB (both ears alike).
 DIRECTIONAL_MAX_DB = 2.0
@@ -326,10 +326,12 @@ def render_v3(audio: NDArray, sample_rate: int, plan: dict[str, Any],
         bed.data[bed.names.index("L")] += low[0]
         bed.data[bed.names.index("R")] += low[1]
     t = tick("neutral", t)
-    return SceneResult(binaural=(low + upper_m).astype(np.float32), objects=objects_out,
+    binaural, limit_db = limit_peaks(low + upper_m, sr)
+    return SceneResult(binaural=binaural, objects=objects_out,
                        bed=bed.data, info={
         "engine": "v3-objects", "hrtf": hs.name, "head": head, "space": space,
-        "crossover_hz": crossover, "timbre_match": timbre, "width_match": width, "objects": names,
+        "crossover_hz": crossover, "timbre_match": timbre, "width_match": width,
+        "limiter_db": limit_db, "objects": names,
         "moving_sources": moving, "directional_db": directional_db, "late_field": False,
         "render_s": round(time.perf_counter() - t_start, 3), "stage_s": {
             k: round(v, 3) for k, v in tm.items()}})

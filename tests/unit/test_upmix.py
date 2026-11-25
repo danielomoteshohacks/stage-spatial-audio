@@ -54,3 +54,18 @@ def test_the_render_is_not_narrower_than_the_record(tmp_path):
     spat = width_ratio(sosfiltfilt(sos, y.T, axis=-1))
     assert spat >= 0.85 * orig, (spat, orig)
     assert spat <= 2.0 * orig, (spat, orig)  # wider is allowed, but not a hollow, inside-out stage
+
+
+def test_the_limiter_keeps_peaks_under_the_ceiling_and_leaves_quiet_audio_alone():
+    from stage.spatial.upmix import PEAK_CEILING_DB, limit_peaks
+
+    t = np.arange(SR) / SR
+    quiet = 0.3 * np.stack([np.sin(2 * np.pi * 200 * t)] * 2)
+    y, cut = limit_peaks(quiet, SR)
+    assert cut == 0.0 and np.allclose(y, quiet, atol=1e-6)
+    loud = quiet.copy()
+    loud[:, 20000:20200] *= 6.0  # a burst over full scale
+    y, cut = limit_peaks(loud, SR)
+    assert np.max(np.abs(y)) <= 10 ** (PEAK_CEILING_DB / 20) + 1e-6
+    assert cut < 0
+    assert np.allclose(y[:, :15000], loud[:, :15000], atol=1e-6)  # far from the burst: untouched

@@ -124,3 +124,34 @@ def apply_width(render: NDArray, h: NDArray) -> NDArray[np.float32]:
     side = 0.5 * (r[0] - r[1])
     side = fftconvolve(side, np.asarray(h, dtype=np.float32))[:n]
     return np.stack([mid + side, mid - side]).astype(np.float32)
+
+
+#: Sample-peak ceiling of the final render. The inter-sample peak of music sits at most about
+#: 0.5 dB above its sample peak at 44.1 kHz in practice, so -1.5 dBFS keeps it under -1 dBTP.
+PEAK_CEILING_DB = -1.5
+LIMIT_WINDOW_S = 0.04
+
+
+def limit_peaks(x: NDArray, sample_rate: int, ceiling_db: float = PEAK_CEILING_DB
+                ) -> tuple[NDArray[np.float32], float]:
+    """A transparent peak limiter for the final render; returns it and the deepest cut in dB.
+
+    The width matcher raises the side signal, and a side peak adds to a mid peak in one ear: the
+    first live renders measured +4 dBTP. A gain of 1 everywhere the render is under the ceiling,
+    and just enough reduction around each peak. The gain is the minimum of the required gain over
+    a 40 ms window, then a 40 ms moving average of that: every averaged value comes from windows
+    that contain the sample, so the gain never exceeds what the sample needs, and it changes
+    smoothly enough not to be heard as distortion. Zero phase (it is offline), applied to both
+    ears alike so the image does not move."""
+    from scipy.ndimage import minimum_filter1d, uniform_filter1d
+
+    x = np.asarray(x, dtype=np.float32)
+    ceiling = 10.0 ** (ceiling_db / 20.0)
+    peak = np.max(np.abs(x), axis=0)
+    need = np.minimum(1.0, ceiling / np.maximum(peak, 1e-12)).astype(np.float32)
+    if need.min() >= 1.0:
+        return x, 0.0
+    w = max(int(LIMIT_WINDOW_S * sample_rate), 1)
+    g = uniform_filter1d(minimum_filter1d(need, w, mode="nearest"), w, mode="nearest")
+    g = np.minimum(g, need)  # rounding in the average must never let a peak through
+    return (x * g[np.newaxis]).astype(np.float32), round(float(20 * np.log10(g.min())), 2)
