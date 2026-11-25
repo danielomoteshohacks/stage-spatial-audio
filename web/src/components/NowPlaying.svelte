@@ -1,382 +1,292 @@
 <script lang="ts">
-  // The now-playing sheet. It owns nothing but the view: the player, the reports and the plan
-  // come from App, and every change goes back through callbacks.
-  import type { GuardReport } from "../lib/api";
-  import { clampLoop, type LoopRegion, type Side, type SyncPlayer } from "../lib/engine";
-  import { formatTime } from "../lib/format";
-  import { canVibrate } from "../lib/haptics";
-  import { STEM_LABELS, type Character, type SpaceName } from "../lib/labels";
-  import type { Plan } from "../lib/scene";
-  import ABSwitch from "./ABSwitch.svelte";
+  // The full-screen player: cover art on a gradient taken from the track's own colours, the format
+  // pill, a scrubber that also shows how much of the spatial render exists, big soft controls, and
+  // underneath the stage with every object live, the queue, and the details a listener may want
+  // (licence and credit, the guard's verdict, downloads, the calibration game).
+  import type { Item } from "../lib/items";
+  import { hashTint, tintStyle } from "../lib/tint";
+  import type { Plan3 } from "../lib/scene3";
+  import type { Side } from "../lib/stream";
+  import Art from "./Art.svelte";
   import GuardBadge from "./GuardBadge.svelte";
   import Icon from "./Icon.svelte";
-  import Logo from "./Logo.svelte";
-  import SceneControls from "./SceneControls.svelte";
-  import Waveform from "./Waveform.svelte";
+  import PlayButton from "./PlayButton.svelte";
+  import Scrubber from "./Scrubber.svelte";
+  import SpatialPill from "./SpatialPill.svelte";
 
   let {
-    player,
-    channels,
-    title,
-    artist,
-    artworkUrl,
-    report,
-    plan,
-    detectedGenre,
-    downloads,
-    levels,
-    time,
+    item,
+    queue,
+    index,
     playing,
-    side,
-    space = $bindable(),
-    character = $bindable(),
-    motion = $bindable(),
-    genre = $bindable(),
-    feel = $bindable(),
-    feelIntensity = $bindable(),
-    dirty,
     busy,
-    canRerender,
-    onapply,
-    onplan,
-    onrerenderplan,
+    buffering,
+    time,
+    duration,
+    readyUntil,
+    renderProgress,
+    spatialReady,
+    side,
+    plan,
+    guard,
+    feel,
+    canFeel,
+    downloads,
     onclose,
-    onplay,
+    ontoggle,
+    onseek,
     onside,
-    onblindtest,
+    onprev,
+    onnext,
+    onpick,
+    onfeel,
+    oncalibrate,
   }: {
-    player: SyncPlayer;
-    channels: Float32Array[];
-    title: string;
-    artist?: string;
-    artworkUrl: string | null;
-    report: GuardReport | null;
-    plan: Plan | null;
-    detectedGenre: string | null;
-    downloads: { label: string; url: string; file: string }[];
-    levels: Record<string, Float32Array>;
-    time: number;
+    item: Item;
+    queue: Item[];
+    index: number;
     playing: boolean;
-    side: Side;
-    space: SpaceName;
-    character: Character;
-    motion: number;
-    genre: string;
-    feel: boolean;
-    feelIntensity: number;
-    dirty: boolean;
     busy: boolean;
-    canRerender: boolean;
-    onapply: () => void;
-    onplan: (p: Plan) => void;
-    onrerenderplan: () => void;
+    buffering: boolean;
+    time: number;
+    duration: number;
+    readyUntil: number;
+    renderProgress: number;
+    spatialReady: boolean;
+    side: Side;
+    plan: Plan3 | null;
+    guard: { verdict: "pass" | "review" | "fail"; reasons: string[]; coverage?: { analysed_s: number; song_s: number; full: boolean } | null } | null;
+    feel: boolean;
+    canFeel: boolean;
+    downloads: { label: string; url: string; file: string }[];
     onclose: () => void;
-    onplay: () => void;
+    ontoggle: () => void;
+    onseek: (t: number) => void;
     onside: (s: Side) => void;
-    onblindtest: () => void;
+    onprev: () => void;
+    onnext: () => void;
+    onpick: (i: number) => void;
+    onfeel: () => void;
+    oncalibrate: () => void;
   } = $props();
 
-  let loop: LoopRegion | null = $state(null);
-  let solo: string[] = $state([]);
-  let muted: string[] = $state([]);
-  let StageView: typeof import("./StageView.svelte").default | null = $state(null);
-  let stageOpen = $state(false);
-  let parts = $derived(player.stemNames.sort((a, b) => (a === "low_end" ? 1 : b === "low_end" ? -1 : a.localeCompare(b))));
-
-  async function openStage() {
-    stageOpen = !stageOpen;
-    if (stageOpen && !StageView) StageView = (await import("./StageView.svelte")).default;
-  }
-
-  function setLoop(a: number, b: number) {
-    loop = clampLoop(a, b, player.duration);
-    void player.setLoop(loop);
-  }
-
-  function toggle(list: "solo" | "muted", name: string) {
-    if (list === "solo") solo = solo.includes(name) ? solo.filter((n) => n !== name) : [...solo, name];
-    else muted = muted.includes(name) ? muted.filter((n) => n !== name) : [...muted, name];
-    if (!solo.length && !muted.length) player.useFullRender();
-    else player.setStemMix({ solo, muted });
-  }
+  let panel: "stage" | "queue" | "about" = $state("stage");
+  const style = $derived(tintStyle(hashTint(item.artId ?? item.id)));
+  const lic = $derived(item.track?.licence);
 </script>
 
-<div class="np">
-  <div class="backdrop" aria-hidden="true">
-    {#if artworkUrl}<img src={artworkUrl} alt="" />{/if}
-  </div>
-
-  <header class="bar">
-    <button class="btn icon ghost" type="button" onclick={onclose} aria-label="Minimise the player"><Icon name="chevron-down" /></button>
+<div class="np" style={style}>
+  <header>
+    <button type="button" class="btn icon ghost" onclick={onclose} aria-label="Close the player">
+      <Icon name="chevron-down" size={24} />
+    </button>
     <span class="eyebrow">Now playing</span>
-    <GuardBadge {report} />
+    <button
+      type="button"
+      class="btn icon ghost"
+      onclick={() => (panel = "queue")}
+      aria-label="Show the queue"
+    >
+      <Icon name="queue" size={22} />
+    </button>
   </header>
 
-  <div class="art">
-    {#if artworkUrl}
-      <img src={artworkUrl} alt={`Cover of ${title}`} />
-    {:else}
-      <div class="brand-art"><Logo size={96} title="" /></div>
-    {/if}
+  <div class="hero">
+    <div class="art"><Art id={item.artId ?? item.id} src={item.artworkUrl} size={280} radius={28} label="Cover art" /></div>
+    <div class="title">
+      <h1>{item.title}</h1>
+      <p class="muted">{item.artist}</p>
+    </div>
   </div>
 
-  <div class="titles">
-    <h2>{title}</h2>
-    {#if artist}<p class="muted">{artist}</p>{/if}
-  </div>
-
-  <ABSwitch {side} onchange={onside} />
-
-  <div class="scrub">
-    <Waveform {channels} duration={player.duration} {time} {loop} onseek={(t) => void player.seek(t)} onloop={setLoop} />
-    <div class="times faint"><span>{formatTime(time)}</span><span>{formatTime(player.duration)}</span></div>
-  </div>
+  <SpatialPill {side} {spatialReady} progress={renderProgress} {buffering} onchange={onside} />
 
   <div class="transport">
-    <button class="btn icon" type="button" onclick={() => void player.seek(Math.max(0, time - 5))} aria-label="Back 5 seconds"><Icon name="back" /></button>
-    <button class="play" type="button" onclick={onplay} aria-label={playing ? "Pause" : "Play"}><Icon name={playing ? "pause" : "play"} size={30} /></button>
-    <button class="btn icon" type="button" class:on={!!loop} onclick={() => { loop = null; void player.setLoop(null); }} aria-label={loop ? "Clear the loop" : "Drag on the waveform to loop a part"} disabled={!loop}><Icon name="loop" /></button>
-  </div>
-  <p class="hint faint"><Icon name="headphones" size={16} /> Headphones on. Drag across the waveform to loop a passage.</p>
-
-  <section class="card glass">
-    <SceneControls bind:space bind:character bind:motion bind:genre detected={detectedGenre} {dirty} {busy} canApply={canRerender} {onapply} />
-  </section>
-
-  {#if plan}
-    <section class="card glass">
-      <button class="row-btn" type="button" aria-expanded={stageOpen} onclick={openStage}>
-        <Icon name="stage" /> <span>The stage</span> <span class="faint">see every part around you, move them</span>
-        <Icon name={stageOpen ? "chevron-up" : "chevron-down"} />
+    <Scrubber {time} {duration} ready={readyUntil} {onseek} />
+    <div class="controls">
+      <button type="button" class="btn icon ghost" onclick={onprev} aria-label="Previous" disabled={index <= 0}>
+        <Icon name="prev" size={24} />
       </button>
-      {#if stageOpen && StageView}
-        <StageView {plan} {levels} {time} busy={busy || !canRerender} onchange={onplan} onrerender={onrerenderplan} />
-      {/if}
-    </section>
-  {/if}
+      <PlayButton {playing} {busy} size={84} onclick={ontoggle} />
+      <button type="button" class="btn icon ghost" onclick={onnext} aria-label="Next" disabled={index >= queue.length - 1}>
+        <Icon name="next" size={24} />
+      </button>
+    </div>
+  </div>
 
-  {#if parts.length}
-    <section class="card glass">
-      <p class="eyebrow">Parts</p>
-      <ul class="parts">
-        {#each parts as name (name)}
+  <div class="tools">
+    {#if canFeel}
+      <button type="button" class="chip" aria-pressed={feel} onclick={onfeel}>Feel the bass</button>
+    {/if}
+    <button type="button" class="chip" onclick={oncalibrate}><Icon name="ear" size={16} />&nbsp;Fit to my ears</button>
+    {#if guard}<GuardBadge verdict={guard.verdict} reasons={guard.reasons} coverage={guard.coverage} />{/if}
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="More about this track">
+    {#each [["stage", "Stage"], ["queue", "Queue"], ["about", "About"]] as [id, label] (id)}
+      <button role="tab" type="button" aria-selected={panel === id} class="chip" onclick={() => (panel = id as typeof panel)}>
+        {label}
+      </button>
+    {/each}
+  </div>
+
+  <div class="panel" role="tabpanel">
+    {#if panel === "stage"}
+      {#if plan}
+        {#await import("./StageView.svelte") then m}
+          <m.default {plan} {time} />
+        {/await}
+      {:else}
+        <p class="muted">The stage appears when the first part of the song has been placed.</p>
+      {/if}
+    {:else if panel === "queue"}
+      <ol class="queue">
+        {#each queue as q, i (q.id)}
           <li>
-            <span>{STEM_LABELS[name] ?? name}</span>
-            <button type="button" class="mini" aria-pressed={solo.includes(name)} onclick={() => toggle("solo", name)}>Solo</button>
-            <button type="button" class="mini" aria-pressed={muted.includes(name)} onclick={() => toggle("muted", name)}>Mute</button>
+            <button type="button" aria-current={i === index ? "true" : undefined} onclick={() => onpick(i)}>
+              <Art id={q.id} src={q.artworkUrl} size={40} radius={8} />
+              <span class="qm"><span class="qt">{q.title}</span><span class="qa">{q.artist}</span></span>
+            </button>
           </li>
         {/each}
-      </ul>
-    </section>
-  {/if}
-
-  {#if canVibrate()}
-    <section class="card glass">
-      <div class="row">
-        <span><Icon name="pulse" /></span>
-        <label for="feel" class="grow">Feel the kick <span class="faint">(vibration on the beat)</span></label>
-        <input id="feel" type="checkbox" bind:checked={feel} />
+      </ol>
+    {:else}
+      <div class="about matte">
+        {#if lic}
+          <p>
+            <strong>Licence:</strong>
+            <a href={lic.url} target="_blank" rel="noopener noreferrer">{lic.label}</a>
+            {#if lic.share_alike}(the spatial version is shared under the same licence){/if}
+          </p>
+          <p class="small muted">{item.track?.attribution}</p>
+          <p>
+            <a href={item.track?.landing_url} target="_blank" rel="noopener noreferrer">The track's own page</a>
+          </p>
+        {:else}
+          <p>Your own file. It is processed on the server and deleted; a copy stays on this device only.</p>
+        {/if}
+        {#if plan}
+          <p class="small muted">
+            Genre: {plan.genre ?? "unknown"} · space: {plan.space === "dry_stage" ? "Dry stage" : plan.space} · head: {plan.hrtf ?? "D1"}
+          </p>
+        {/if}
+        {#if downloads.length}
+          <div class="dl">
+            {#each downloads as d (d.url)}
+              <a class="btn" href={d.url} download={d.file}><Icon name="download" size={16} />{d.label}</a>
+            {/each}
+          </div>
+        {/if}
       </div>
-      {#if feel}
-        <label class="field-label" for="feel-int">Intensity <span class="value">{Math.round(feelIntensity * 100)} percent</span></label>
-        <input id="feel-int" type="range" min="0.1" max="1" step="0.05" bind:value={feelIntensity} style:--fill={`${feelIntensity * 100}%`} />
-      {/if}
-    </section>
-  {/if}
-
-  <section class="card glass">
-    <button class="row-btn" type="button" onclick={onblindtest}><Icon name="flask" /> <span>Blind test</span> <span class="faint">compare without knowing which is which</span></button>
-  </section>
-
-  {#if downloads.length}
-    <section class="downloads">
-      {#each downloads as d (d.file)}
-        <a class="btn" href={d.url} download={d.file}><Icon name="download" size={18} /> {d.label}</a>
-      {/each}
-    </section>
-  {/if}
+    {/if}
+  </div>
 </div>
 
 <style>
   .np {
-    position: relative;
+    min-height: 100dvh;
+    display: grid;
+    align-content: start;
+    gap: var(--gap-4);
+    padding: 0 var(--gap-5) var(--gap-7);
+    background:
+      radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--tint-1) 42%, var(--bg)), transparent 70%),
+      linear-gradient(180deg, color-mix(in srgb, var(--tint-2) 20%, var(--bg)) 0%, var(--bg) 62%);
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .hero {
     display: grid;
     gap: var(--gap-5);
-    padding-bottom: var(--gap-6);
+    justify-items: center;
   }
-
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    overflow: hidden;
-    background: radial-gradient(90% 60% at 50% 0%, color-mix(in srgb, var(--accent) 28%, transparent), transparent 70%), var(--ink);
+  .art :global(.art) {
+    width: min(280px, 72vw);
+    height: min(280px, 72vw);
+    box-shadow: var(--shadow-3);
   }
-
-  .backdrop img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    filter: blur(60px) saturate(140%) brightness(0.45);
-    transform: scale(1.3);
-  }
-
-  .bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .art {
-    width: min(78vw, 340px);
-    aspect-ratio: 1;
-    margin: 0 auto;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: var(--shadow-2);
-  }
-
-  .art img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .brand-art {
-    width: 100%;
-    height: 100%;
-    display: grid;
-    place-items: center;
-    background:
-      radial-gradient(70% 70% at 30% 20%, rgb(31 200 180 / 0.35), transparent 60%),
-      radial-gradient(60% 60% at 80% 90%, rgb(255 122 92 / 0.3), transparent 60%),
-      var(--ink-3);
-  }
-
-  .titles {
+  .title {
     text-align: center;
+    max-width: 100%;
   }
-
-  .titles h2 {
+  h1 {
     font-size: var(--text-xl);
     overflow-wrap: anywhere;
   }
-
-  .times {
-    display: flex;
-    justify-content: space-between;
-    font-size: var(--text-xs);
-    margin-top: 4px;
-  }
-
   .transport {
+    display: grid;
+    gap: var(--gap-3);
+    max-width: 520px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .controls {
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
     gap: var(--gap-6);
   }
-
-  .play {
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
-    border: 0;
-    background: var(--ivory);
-    color: var(--ink);
-    display: grid;
-    place-items: center;
-    cursor: pointer;
-    box-shadow: var(--shadow-2);
-  }
-
-  .hint {
+  .tools {
     display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 6px;
-    font-size: var(--text-xs);
-    text-align: center;
-  }
-
-  .card {
-    padding: var(--gap-5);
-    border-radius: var(--radius-lg);
-    display: grid;
-    gap: var(--gap-4);
-  }
-
-  .row-btn {
-    display: flex;
-    align-items: center;
-    gap: var(--gap-3);
-    width: 100%;
-    min-height: 44px;
-    border: 0;
-    background: transparent;
-    text-align: left;
-    cursor: pointer;
     flex-wrap: wrap;
+    gap: var(--gap-2);
+    justify-content: center;
   }
-
-  .row-btn .faint {
-    flex: 1;
-    font-size: var(--text-sm);
+  .tabs {
+    display: flex;
+    gap: var(--gap-2);
+    justify-content: center;
   }
-
-  .parts {
+  .panel {
+    max-width: 560px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .queue {
     list-style: none;
     margin: 0;
     padding: 0;
     display: grid;
-    gap: var(--gap-2);
+    gap: 2px;
   }
-
-  .parts li {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    align-items: center;
-    gap: var(--gap-2);
-    font-size: var(--text-sm);
-  }
-
-  .mini {
-    min-height: 36px;
-    min-width: 56px;
-    border-radius: var(--radius-pill);
-    border: 1px solid var(--hairline);
-    background: transparent;
-    font-size: var(--text-xs);
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .mini[aria-pressed="true"] {
-    background: var(--accent);
-    color: var(--accent-ink);
-    border-color: transparent;
-  }
-
-  .row {
+  .queue button {
+    width: 100%;
     display: flex;
     align-items: center;
     gap: var(--gap-3);
+    border: 0;
+    background: transparent;
+    padding: var(--gap-2);
+    border-radius: var(--radius-sm);
+    text-align: left;
+    color: inherit;
   }
-
-  .grow {
-    flex: 1;
+  .queue button[aria-current="true"] {
+    background: var(--accent-soft);
   }
-
-  input[type="checkbox"] {
-    width: 22px;
-    height: 22px;
-    accent-color: var(--lagoon);
+  .qm {
+    display: grid;
+    min-width: 0;
   }
-
-  .downloads {
+  .qt {
+    font-weight: 600;
+    font-size: var(--text-sm);
+  }
+  .qa {
+    font-size: var(--text-xs);
+    color: var(--text-2);
+  }
+  .about {
+    padding: var(--gap-4);
+    display: grid;
+    gap: var(--gap-3);
+  }
+  .dl {
     display: flex;
     flex-wrap: wrap;
     gap: var(--gap-2);
-    justify-content: center;
   }
 </style>

@@ -93,7 +93,11 @@
 
   /* A bare sheet draws its own top bar (the player); give it the safe-area inset instead. */
   .bare .body {
-    padding-top: max(var(--gap-3), env(safe-area-inset-top));
+    padding: max(var(--gap-3), env(safe-area-inset-top)) 0 0;
+  }
+
+  .bare .panel {
+    background: var(--bg);
   }
 
   header {

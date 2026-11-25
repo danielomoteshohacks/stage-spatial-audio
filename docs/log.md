@@ -595,3 +595,41 @@ the seed's own promise: at least 60 tracks, no NC or ND, every URL checked, 90 t
 ### Next
 
 Phase 5: the product.
+
+## 2026-11-25. v3 Phase 5: the product
+
+### Done
+
+The v3 web app (decision 0029, web/BRAND.md): light and dark themes from one set of material
+tokens, tab bar and left rail, Home, Browse, Library, Create and Credits, a mini player and a full
+now-playing sheet with the Original and Spatial pill, the stage view, the calibration game, the
+StreamPlayer that plays while segments arrive, Media Session, a manifest. Screenshots of every
+screen in both themes and two sizes are in docs/screens/.
+
+### Measured
+
+Lighthouse (mobile, median of 3): performance 0.98 light, 0.99 dark; accessibility 1.00; best
+practices 0.96. Emulated mid-range Android, 4x CPU, slow 4G: FCP 456 ms, LCP 732 ms, TBT 52 ms,
+105 KB, first shelf visible at 2.0 s. 47 web tests.
+
+### What went wrong
+
+- First Lighthouse performance was 0.69 to 0.74: shelves arriving late shifted the layout
+  (skeletons with fixed heights fixed it), and the light lagoon measured 4.27:1 (darkened to
+  #07756a, 5.3:1).
+- The calibration sheet never opened: a sheet's close handler fired when it was closed from code.
+  Handlers now close only their own sheet.
+- Saving a render to the library failed silently: a reactive proxy cannot be stored in IndexedDB.
+  The entry is cloned through JSON first.
+- A saved copy changed its cover colour because the tint came from the new id; it now keeps the
+  original track's id for art.
+
+### Not measured
+
+A real phone. The profile is emulated. Streaming time to first sound against the neural cascade
+is not known because no GPU run has happened (see Phase 3).
+
+### Next
+
+Phase 6: benchmark of v1, v2 and v3, the blind test with an Atmos-style reference slot, the
+architecture and roadmap documents.

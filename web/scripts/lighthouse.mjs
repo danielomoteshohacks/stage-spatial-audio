@@ -25,10 +25,12 @@ try {
   }
   // Three runs and the median per category, as Lighthouse CI does by default: one run on a
   // shared CI machine varies by 0.1 or more (0.97 and 0.85 on the same build).
+  // Both themes: light is the default, dark is what a listener with a dark system gets.
+  for (const theme of ["light", "dark"]) {
   const runs = [];
   for (let i = 0; i < RUNS; i++) {
-    const out = `lighthouse-report-${i}.json`;
-    const run = spawnSync("npx", ["-y", "lighthouse@12.8.2", "http://127.0.0.1:4317/", "--quiet",
+    const out = `lighthouse-report-${theme}-${i}.json`;
+    const run = spawnSync("npx", ["-y", "lighthouse@12.8.2", `http://127.0.0.1:4317/?theme=${theme}`, "--quiet",
       "--chrome-flags=--headless=new --no-sandbox", "--only-categories=performance,accessibility,best-practices",
       "--output=json", `--output-path=${out}`], { stdio: "inherit" });
     if (run.status !== 0) process.exit(run.status ?? 1);
@@ -37,12 +39,13 @@ try {
   }
   const median = (xs) => [...xs].sort((p, q) => p - q)[Math.floor(xs.length / 2)];
   const scores = Object.fromEntries(Object.keys(runs[0]).map((k) => [k, median(runs.map((r) => r[k]))]));
-  console.log("Lighthouse (mobile), runs:", runs);
-  console.log("Lighthouse (mobile), median:", scores);
+  console.log(`Lighthouse (mobile, ${theme}), runs:`, runs);
+  console.log(`Lighthouse (mobile, ${theme}), median:`, scores);
   const failing = ["performance", "accessibility"].filter((k) => scores[k] < MIN);
   if (failing.length) {
-    console.error(`below ${MIN}: ${failing.join(", ")}`);
+    console.error(`${theme} is below ${MIN}: ${failing.join(", ")}`);
     process.exit(1);
+  }
   }
 } finally {
   preview.kill();

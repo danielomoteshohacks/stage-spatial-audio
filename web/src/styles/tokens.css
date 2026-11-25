@@ -1,39 +1,52 @@
-/* SoundStage brand tokens. See web/BRAND.md for the reasoning and the contrast checks.
-   Colours come from a Lagos lagoon at sunset: deep night ink, the lagoon's luminous teal, the
-   coral of the last light, and the ivory of the shore. */
+/* SoundStage v3 design tokens. See web/BRAND.md for the reasoning and the contrast checks.
+   Light is the default; dark follows the system setting unless the listener chooses
+   (src/lib/theme.ts sets data-theme on <html>). The two themes share one set of material tokens:
+   a matte surface with a very fine grain, a glossy highlight, translucent overlays with a blur,
+   and layered shadows; only the colours differ. */
 :root {
-  /* Ink: the night. Surfaces are layers of frosted glass above it. */
-  --ink: #08090d;
-  --ink-2: #0e1016;
-  --ink-3: #151821;
-  --glass: rgb(22 25 34 / 0.62);
-  --glass-strong: rgb(28 31 42 / 0.82);
-  --hairline: rgb(244 241 234 / 0.1);
-  --hairline-top: rgb(244 241 234 / 0.18);
+  color-scheme: light;
 
-  /* Ivory text, at three strengths (all at least 4.5:1 on --ink and on --glass over ink). */
-  --ivory: #f4f1ea;
-  --ivory-2: rgb(244 241 234 / 0.72);
-  --ivory-3: rgb(244 241 234 / 0.56);
+  /* Light: a warm white base, soft neutral cards. */
+  --bg: #faf8f5;
+  --bg-2: #f3f0eb;
+  --surface: #ffffff;
+  --surface-2: #f6f3ee;
+  --surface-3: #ece8e1;
+  --overlay: rgb(255 255 255 / 0.7);
+  --overlay-strong: rgb(255 255 255 / 0.86);
+  --hairline: rgb(28 26 22 / 0.09);
+  --hairline-strong: rgb(28 26 22 / 0.16);
+  --highlight: rgb(255 255 255 / 0.9);
+  --grain-opacity: 0.045;
 
-  /* Signature colours, tuned for AA on ink: lagoon 9.5:1, coral 7.8:1; ink on lagoon 9.5:1. */
-  --lagoon: #1fc8b4;
-  --lagoon-deep: #0f7f73;
-  --lagoon-glow: rgb(31 200 180 / 0.28);
-  --coral: #ff7a5c;
-  --coral-glow: rgb(255 122 92 / 0.26);
+  /* Text, three strengths; all at least 4.5:1 on --bg and --surface. */
+  --text: #1c1a16;
+  --text-2: #55504a;
+  --text-3: #6b655d;
 
-  /* Status, used sparingly: the guard's verdict. */
-  --pass: #1fc8b4;
-  --review: #f2c14e;
-  --fail: #ff7a5c;
-
-  /* Dynamic accent: the now-playing screen replaces these with colours from the artwork. */
+  /* Two refined accents. Lagoon is "spatial", coral is "original". Both carry white text. */
+  --lagoon: #07756a;
+  --lagoon-soft: rgb(7 117 106 / 0.12);
+  --coral: #c4432a;
+  --coral-soft: rgb(196 67 42 / 0.12);
   --accent: var(--lagoon);
   --accent-2: var(--coral);
-  --accent-ink: #061412;
+  --accent-ink: #ffffff;
+  --accent-soft: var(--lagoon-soft);
 
-  /* Type. Instrument Sans for the interface, Instrument Serif for editorial headings. */
+  --pass: #07756a;
+  --review: #8a5a00;
+  --fail: #c4432a;
+
+  --shadow-1: 0 1px 1px rgb(40 30 20 / 0.05), 0 2px 6px rgb(40 30 20 / 0.06);
+  --shadow-2: 0 1px 2px rgb(40 30 20 / 0.06), 0 6px 14px rgb(40 30 20 / 0.08),
+    0 18px 36px rgb(40 30 20 / 0.08);
+  --shadow-3: 0 2px 4px rgb(40 30 20 / 0.08), 0 14px 28px rgb(40 30 20 / 0.12),
+    0 36px 64px rgb(40 30 20 / 0.12);
+  --shadow-play: 0 2px 4px rgb(7 117 106 / 0.3), 0 10px 22px rgb(7 117 106 / 0.32),
+    0 22px 40px rgb(7 117 106 / 0.22);
+
+  /* Type: Instrument Sans for the interface, Instrument Serif for editorial headings. */
   --font-ui: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
   --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
   --text-xs: 0.75rem;
@@ -41,9 +54,8 @@
   --text-md: 1rem;
   --text-lg: 1.25rem;
   --text-xl: 1.75rem;
-  --text-hero: clamp(2.6rem, 10vw, 4.75rem);
+  --text-hero: clamp(2.2rem, 8vw, 3.6rem);
 
-  /* Space, radius, shadow and motion. */
   --gap-1: 4px;
   --gap-2: 8px;
   --gap-3: 12px;
@@ -55,14 +67,53 @@
   --radius-md: 16px;
   --radius-lg: 24px;
   --radius-pill: 999px;
-  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.28);
-  --shadow-2: 0 2px 4px rgb(0 0 0 / 0.35), 0 12px 32px rgb(0 0 0 / 0.38), 0 32px 64px rgb(0 0 0 / 0.3);
   --blur: 22px;
+  --nav-h: 64px;
+  --mini-h: 64px;
+  --nav-w: 232px;
+
+  /* A critically damped spring sampled as an easing, and a slightly overshooting one for the
+     play button: motion that settles instead of stopping. */
+  --spring: linear(0, 0.18 4%, 0.58 12%, 0.88 22%, 1.03 34%, 1.04 42%, 1 62%, 0.995 80%, 1);
+  --spring-bounce: linear(0, 0.3 6%, 0.78 16%, 1.1 30%, 1.08 40%, 0.98 56%, 1.01 72%, 1);
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-1: 120ms;
   --dur-2: 240ms;
   --dur-3: 420ms;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* Dark: deep charcoal, not black, with the same materials. */
+  --bg: #15161b;
+  --bg-2: #1a1b21;
+  --surface: #1f2128;
+  --surface-2: #262830;
+  --surface-3: #2e3039;
+  --overlay: rgb(31 33 40 / 0.66);
+  --overlay-strong: rgb(31 33 40 / 0.88);
+  --hairline: rgb(244 240 232 / 0.09);
+  --hairline-strong: rgb(244 240 232 / 0.18);
+  --highlight: rgb(255 255 255 / 0.1);
+  --grain-opacity: 0.07;
+  --text: #f3efe8;
+  --text-2: #b9b3a8;
+  --text-3: #9a948a;
+  --lagoon: #34d6c2;
+  --lagoon-soft: rgb(52 214 194 / 0.16);
+  --coral: #ff8a6d;
+  --coral-soft: rgb(255 138 109 / 0.16);
+  --accent-ink: #07211d;
+  --pass: #34d6c2;
+  --review: #f2c14e;
+  --fail: #ff8a6d;
+  --shadow-1: 0 1px 1px rgb(0 0 0 / 0.3), 0 2px 8px rgb(0 0 0 / 0.28);
+  --shadow-2: 0 2px 4px rgb(0 0 0 / 0.32), 0 10px 24px rgb(0 0 0 / 0.36),
+    0 24px 48px rgb(0 0 0 / 0.3);
+  --shadow-3: 0 3px 6px rgb(0 0 0 / 0.4), 0 18px 36px rgb(0 0 0 / 0.46),
+    0 44px 80px rgb(0 0 0 / 0.4);
+  --shadow-play: 0 2px 4px rgb(0 0 0 / 0.4), 0 10px 24px rgb(52 214 194 / 0.28),
+    0 24px 44px rgb(52 214 194 / 0.2);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -70,5 +121,27 @@
     --dur-1: 0ms;
     --dur-2: 0ms;
     --dur-3: 0ms;
+    --spring: linear;
+    --spring-bounce: linear;
   }
+}
+
+/* Names the v2 components still use, mapped onto the v3 tokens. */
+:root {
+  --ink: var(--bg);
+  --ink-2: var(--surface-2);
+  --ink-3: var(--surface-3);
+  --ivory: var(--text);
+  --ivory-2: var(--text-2);
+  --ivory-3: var(--text-3);
+  --glass: var(--overlay);
+  --glass-strong: var(--overlay-strong);
+  --hairline-top: var(--hairline-strong);
+  --coral-glow: var(--coral-soft);
+  --lagoon-glow: var(--lagoon-soft);
+}
+
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --spring-bounce: linear(0, 0.3 6%, 0.78 16%, 1.1 30%, 1.08 40%, 0.98 56%, 1.01 72%, 1);
 }

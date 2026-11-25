@@ -281,6 +281,7 @@ def v3_process(audio_file, options_json=""):
 
 from stage.catalogue.fetch import FetchRefused, download, suffix_for  # noqa: E402
 from stage.catalogue.store import Catalogue  # noqa: E402
+from stage.server.calibration import create_calibration_router  # noqa: E402
 from stage.server.catalog import create_catalog_router  # noqa: E402
 
 CATALOGUE = Catalogue()
@@ -317,6 +318,7 @@ def build_app():
     api.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"],
                        allow_headers=["*"])
     api.include_router(_router)
+    api.include_router(create_calibration_router())
     api.include_router(create_catalog_router(CATALOGUE, STORE, background=False))
     return gr.mount_gradio_app(api, demo, path="/", allowed_paths=[str(WORK_ROOT)])
 
@@ -341,6 +343,14 @@ def fetch_assets() -> None:
             print("genre tagger ready", flush=True)
         except Exception as exc:
             print(f"genre tagger unavailable, templates default to pop: {exc}", flush=True)
+        try:
+            from stage.spatial.heads import PUBLISHED, ensure_head
+
+            for head in PUBLISHED:
+                ensure_head(head)
+            print("measured heads ready", flush=True)
+        except Exception as exc:
+            print(f"some measured heads unavailable: {exc}", flush=True)
         weights = fetch_weights()
         print(f"SoundStage Separator weights: {weights or 'not published yet; the teacher runs'}",
               flush=True)

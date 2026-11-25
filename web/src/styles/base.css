@@ -1,5 +1,5 @@
-/* Global styles on top of tokens.css. Mobile first: the layout is designed at 360 to 412 px
-   (a Galaxy S21 FE is 412 CSS px wide) and widens from 720 px. */
+/* Global styles on top of tokens.css. Mobile first: designed at 360 to 412 px (a Galaxy S21 FE is
+   412 CSS px wide); a left navigation replaces the bottom tab bar from 900 px. */
 
 *,
 *::before,
@@ -8,25 +8,34 @@
 }
 
 html {
-  color-scheme: dark;
-  background: var(--ink);
+  background: var(--bg);
   -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   margin: 0;
   min-height: 100dvh;
-  background:
-    radial-gradient(120% 60% at 50% -10%, rgb(31 200 180 / 0.1), transparent 60%),
-    radial-gradient(80% 40% at 100% 110%, rgb(255 122 92 / 0.08), transparent 60%),
-    var(--ink);
-  color: var(--ivory);
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--font-ui);
   font-size: var(--text-md);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "tnum" 1;
   overscroll-behavior-y: none;
+}
+
+/* The matte grain: a very fine noise over everything, under the content, so flat colour has the
+   soft tooth of paper. An inline SVG turbulence filter, 160 px tile, no request. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 h1,
@@ -44,7 +53,7 @@ p {
 }
 
 a {
-  color: var(--lagoon);
+  color: var(--accent);
 }
 
 button,
@@ -54,8 +63,14 @@ select {
   color: inherit;
 }
 
+button {
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 :focus-visible {
-  outline: 2px solid var(--lagoon);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
   border-radius: 6px;
 }
@@ -72,34 +87,45 @@ select {
   border: 0;
 }
 
-/* Frosted glass: translucent fill, blur, a light hairline on the top edge only. */
-.glass {
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
-  backdrop-filter: blur(var(--blur)) saturate(140%);
+/* Materials. matte: a flat card with a fine hairline and a soft layered shadow. glossy: the same
+   with a bright edge along the top, as if lit from above. glass: a translucent overlay with a
+   blur, for anything that floats over content (the tab bar, the mini player, sheets). */
+.matte {
+  background: var(--surface);
   border: 1px solid var(--hairline);
-  border-top-color: var(--hairline-top);
-  box-shadow: var(--shadow-2);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+
+.glossy {
+  background: linear-gradient(180deg, var(--highlight) 0%, transparent 38%), var(--surface);
+  border: 1px solid var(--hairline);
+  border-top-color: var(--hairline-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2), inset 0 1px 0 var(--highlight);
+}
+
+.glass {
+  background: var(--overlay);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(150%);
+  backdrop-filter: blur(var(--blur)) saturate(150%);
+  border: 1px solid var(--hairline);
+  border-top-color: var(--hairline-strong);
 }
 
 .eyebrow {
   font-size: var(--text-xs);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ivory-3);
-  font-weight: 500;
+  color: var(--text-3);
+  font-weight: 600;
 }
 
 .muted {
-  color: var(--ivory-2);
+  color: var(--text-2);
 }
 
-.faint {
-  color: var(--ivory-3);
-}
-
-/* Buttons */
+/* Buttons. A pill with a soft shadow; pressing sinks it on a spring. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -107,21 +133,31 @@ select {
   gap: var(--gap-2);
   min-height: 44px;
   padding: 0 var(--gap-5);
+  border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-pill);
-  border: 1px solid var(--hairline);
-  background: rgb(244 241 234 / 0.06);
-  cursor: pointer;
-  transition: background var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.btn:hover {
-  background: rgb(244 241 234 / 0.1);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: var(--shadow-1);
+  transition: transform var(--dur-2) var(--spring), box-shadow var(--dur-2) var(--ease),
+    background var(--dur-1) var(--ease);
 }
 
 .btn:active {
-  transform: scale(0.98);
+  transform: scale(0.96);
+  box-shadow: none;
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+  box-shadow: var(--shadow-play);
+}
+
+.btn.ghost {
+  background: transparent;
+  box-shadow: none;
 }
 
 .btn:disabled {
@@ -129,135 +165,96 @@ select {
   cursor: default;
 }
 
-.btn.primary {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-color: transparent;
-  box-shadow: 0 8px 28px var(--lagoon-glow);
-}
-
-.btn.primary:hover {
-  filter: brightness(1.06);
-}
-
-.btn.icon {
-  padding: 0;
-  width: 44px;
-}
-
-.btn.ghost {
-  background: transparent;
-  border-color: transparent;
-}
-
-/* Segmented choice */
-.segmented {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: var(--radius-pill);
-  background: rgb(244 241 234 / 0.05);
-  border: 1px solid var(--hairline);
-}
-
-.segmented button {
-  flex: 1;
+/* Chips and pills. */
+.chip {
+  display: inline-flex;
+  align-items: center;
   min-height: 36px;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--ivory-2);
-  cursor: pointer;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
-}
-
-.segmented button[aria-checked="true"] {
-  background: rgb(244 241 234 / 0.12);
-  color: var(--ivory);
-}
-
-/* Range slider */
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 28px;
-  background: transparent;
-  --fill: 50%;
-}
-
-input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 4px;
-  background: linear-gradient(90deg, var(--accent) var(--fill), rgb(244 241 234 / 0.14) var(--fill));
-}
-
-input[type="range"]::-moz-range-track {
-  height: 4px;
-  border-radius: 4px;
-  background: rgb(244 241 234 / 0.14);
-}
-
-input[type="range"]::-moz-range-progress {
-  height: 4px;
-  border-radius: 4px;
-  background: var(--accent);
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 22px;
-  height: 22px;
-  margin-top: -9px;
-  border-radius: 50%;
-  background: var(--ivory);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.5);
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--ivory);
-}
-
-select,
-.input {
-  min-height: 44px;
-  width: 100%;
   padding: 0 var(--gap-4);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--hairline);
-  background: var(--ink-3);
-}
-
-.field {
-  display: grid;
-  gap: var(--gap-2);
-}
-
-.field-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--text-2);
   font-size: var(--text-sm);
-  color: var(--ivory-2);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+    transform var(--dur-2) var(--spring);
 }
 
-.field-label .value {
-  color: var(--ivory);
+.chip[aria-pressed="true"],
+.chip.on {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+}
+
+.chip:active {
+  transform: scale(0.95);
+}
+
+.scroller {
+  display: flex;
+  gap: var(--gap-3);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--gap-4);
+  scrollbar-width: none;
+  padding: var(--gap-2) var(--gap-4) var(--gap-4);
+  margin: 0 calc(var(--gap-4) * -1);
+}
+
+.scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.scroller > * {
+  scroll-snap-align: start;
+  flex: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+.btn.icon {
+  width: 44px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.faint {
+  color: var(--text-3);
+}
+
+.small {
+  font-size: var(--text-xs);
+}
+
+/* Screens share one column: padded, with room for the mini player and the tab bar below. */
+.screen {
+  position: relative;
+  z-index: 1;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: max(var(--gap-5), env(safe-area-inset-top)) var(--gap-4)
+    calc(var(--nav-h) + var(--mini-h) + var(--gap-7) + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 900px) {
+  .screen {
+    margin-left: var(--nav-w);
+    max-width: none;
+    padding: var(--gap-6) var(--gap-7) calc(var(--mini-h) + var(--gap-7));
+  }
+}
+
+input[type="range"] {
+  accent-color: var(--accent);
 }

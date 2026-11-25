@@ -1,98 +1,81 @@
 <script lang="ts">
+  // The shell: four places (Home, Browse, Library, Create), a persistent mini player and a
+  // full-screen player. This file owns the playback and job state; the screens are plain
+  // components that receive data and callbacks.
   import { onDestroy, onMount } from "svelte";
-  import About from "./components/About.svelte";
-  import DropZone from "./components/DropZone.svelte";
-  import Icon from "./components/Icon.svelte";
-  import Logo from "./components/Logo.svelte";
-  import NowPlaying from "./components/NowPlaying.svelte";
-  import ProgressPanel from "./components/ProgressPanel.svelte";
+  import Browse from "./components/Browse.svelte";
+  import Create from "./components/Create.svelte";
+  import Credits from "./components/Credits.svelte";
+  import Home from "./components/Home.svelte";
+  import Library from "./components/Library.svelte";
+  import MiniPlayer from "./components/MiniPlayer.svelte";
   import Sheet from "./components/Sheet.svelte";
-  import {
-    BackendError,
-    checkBackend,
-    diagnose,
-    fetchArrayBuffer,
-    fileUrl,
-    runProcess,
-    runRerender,
-    uploadFile,
-    type Diagnosis,
-    type GuardReport,
-    type ProcessOutput,
-    type ProcessRequest,
-    type StageState,
-  } from "./lib/api";
-  import { artworkUrl as makeArtworkUrl, readTags } from "./lib/artwork";
-  import type { Condition } from "./lib/blindtest";
-  import { SyncPlayer, type Side } from "./lib/engine";
-  import { levelEnvelope } from "./lib/format";
-  import { HapticFeel, lowOnsets } from "./lib/haptics";
-  import { GENRES, SPACE_INFO, type Character, type SpaceName } from "./lib/labels";
-  import { getEntry, listRecent, removeEntry, saveEntry, type LibraryEntry, type LibrarySummary } from "./lib/library";
+  import TabBar, { type Tab } from "./components/TabBar.svelte";
+  import { BackendError, fetchArrayBuffer, uploadFile } from "./lib/api";
+  import { readTags, artworkUrl as makeArtworkUrl } from "./lib/artwork";
+  import { loadHead } from "./lib/calibration";
+  import { HapticFeel, canVibrate, lowOnsets } from "./lib/haptics";
+  import { fromLibrary, fromTrack, type Item } from "./lib/items";
+  import { getEntry, listRecent, removeEntry, saveEntry, type LibrarySummary } from "./lib/library";
   import { setMediaSession, setPlaybackState } from "./lib/media";
-  import type { Plan } from "./lib/scene";
+  import type { Plan3 } from "./lib/scene3";
   import { loadBackendUrl, saveBackendUrl } from "./lib/settings";
-
-  /** The server keeps a track's cache for 30 minutes after its last render. */
-  const SERVER_TTL_MS = 28 * 60 * 1000;
-  const UPLOAD_REUSE_MS = 20 * 60 * 1000;
+  import { StreamPlayer, trimBuffer, type Side } from "./lib/stream";
+  import { initTheme, loadChoice, saveChoice, type ThemeChoice } from "./lib/theme";
+  import {
+    catalog, jobs, optionsJson, pickFormat, streamJob,
+    type JobOptions, type JobState, type Shelf,
+  } from "./lib/v3";
+  import type { Condition } from "./lib/blindtest";
 
   let backend = $state(loadBackendUrl());
-  let backendDraft = $state(loadBackendUrl());
   let status: "checking" | "online" | "offline" = $state("checking");
-  let diagnosis: Diagnosis | null = $state(null);
+  let shelves: Shelf[] = $state([]);
+  let formats: string[] = $state(["opus", "flac"]);
+  let tab: Tab = $state("home");
+  let browseGenre = $state("");
+  let theme: ThemeChoice = $state(loadChoice());
+  let stopTheme = () => {};
 
-  let file: File | null = $state(null);
-  let quick = $state(false);
-  let space: SpaceName = $state("living_room");
-  let character: Character = $state("balanced");
-  let motion = $state(0.5);
-  let genre = $state("auto");
-  let applied = $state({ space: "living_room", character: "balanced", motion: 0.5, genre: "auto" });
-
-  let phase: "idle" | "uploading" | "processing" | "downloading" = $state("idle");
-  let upload = $state(0);
-  let stages: StageState[] = $state([]);
-  let error: string | null = $state(null);
-
-  let player: SyncPlayer | null = $state(null);
-  let channels: Float32Array[] = $state([]);
-  let title = $state("");
-  let artist: string | undefined = $state(undefined);
-  let artworkUrl: string | null = $state(null);
-  let artworkBlob: Blob | undefined = undefined;
-  let report: GuardReport | null = $state(null);
-  let plan: Plan | null = $state(null);
-  let editedPlan: Plan | null = $state(null);
-  let trackId: string | null = $state(null);
-  let renderedAt = $state(0);
-  let detectedGenre: string | null = $state(null);
-  let downloads: { label: string; url: string; file: string }[] = $state([]);
-  let levels: Record<string, Float32Array> = $state({});
-  let time = $state(0);
-  let playing = $state(false);
-  let side: Side = $state("spatial");
-  let feel = $state(false);
-  let feelIntensity = $state(0.6);
-  let haptic: HapticFeel | null = null;
-
-  let sheet: "none" | "player" | "about" | "settings" | "test" = $state("none");
   let recents: LibrarySummary[] = $state([]);
+  let sizes: Record<string, number> = $state({});
+  let head = $state(loadHead());
+
+  // Playback.
+  let current: Item | null = $state(null);
+  let queue: Item[] = $state([]);
+  let index = $state(0);
+  let player: StreamPlayer | null = $state(null);
+  let playing = $state(false);
+  let buffering = $state(false);
+  let side: Side = $state("spatial");
+  let time = $state(0);
+  let duration = $state(0);
+  let readyUntil = $state(0);
+  let job: JobState | null = $state(null);
+  let uploading: number | null = $state(null);
+  let error: string | null = $state(null);
+  let plan: Plan3 | null = $state(null);
+  let guard: { verdict: "pass" | "review" | "fail"; reasons: string[]; coverage?: { analysed_s: number; song_s: number; full: boolean } | null } | null = $state(null);
+  let downloads: { label: string; url: string; file: string }[] = $state([]);
+  let feel = $state(false);
+  let sheet: "none" | "player" | "calibrate" | "test" = $state("none");
+  let creditsOpen = $state(false);
+  let Player: typeof import("./components/NowPlaying.svelte").default | null = $state(null);
+  let CalibrationC: typeof import("./components/Calibration.svelte").default | null = $state(null);
   let BlindTest: typeof import("./components/BlindTest.svelte").default | null = $state(null);
   let conditions: Condition[] = $state([]);
-  let addingV1 = $state(false);
 
+  let ctx: AudioContext | null = $state(null);
   let abort: AbortController | null = null;
-  let uploaded: { file: File; path: string; at: number; backend: string } | null = null;
-  let ctx: AudioContext | null = null;
   let raf = 0;
-
-  let busy = $derived(phase !== "idle");
-  let dirty = $derived(
-    applied.space !== space || applied.character !== character || Math.abs(applied.motion - motion) > 1e-6 || applied.genre !== genre,
-  );
-  const online = (): boolean => status === "online";
-  let canRerender = $derived(!!trackId && Date.now() - renderedAt < SERVER_TTL_MS && online());
+  let haptic: HapticFeel | null = null;
+  let originalBuf: AudioBuffer | null = null;
+  let originalBlob: Blob | null = null;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, never rendered
+  let fetched = new Set<number>();
+  let pumping = false;
+  let runToken = 0;
 
   function audio(): AudioContext {
     ctx ??= new AudioContext({ latencyHint: "playback" });
@@ -101,676 +84,423 @@
 
   async function check() {
     status = "checking";
-    diagnosis = null;
     try {
-      await checkBackend(backend);
+      const h = await jobs.health(backend);
+      formats = h.formats;
       status = "online";
-    } catch (e) {
+      const s = await catalog.shelves(backend);
+      shelves = s.shelves;
+    } catch {
       status = "offline";
-      diagnosis =
-        e instanceof BackendError && e.kind === "protocol"
-          ? { title: "That address is not a SoundStage server", detail: e.message, fixes: ["Check the address in Settings."] }
-          : diagnose(backend, window.location);
     }
   }
 
-  function request(extra: Partial<ProcessRequest> = {}): ProcessRequest {
-    return {
-      mode: quick ? "lite" : "stems",
-      profile: `space:${space}`,
-      beta: 2.0,
-      start: null,
-      seconds: 30,
-      genre,
-      motion,
-      character,
-      ...extra,
-    };
+  async function refreshLibrary() {
+    recents = await listRecent();
   }
 
-  async function pick(f: File) {
-    file = f;
-    error = null;
-    const tags = await readTags(f);
-    title = tags.title || f.name.replace(/\.[^.]+$/, "");
-    artist = tags.artist;
-    if (artworkUrl) URL.revokeObjectURL(artworkUrl);
-    artworkUrl = makeArtworkUrl(tags.artwork);
-    artworkBlob = tags.artwork ? new Blob([new Uint8Array(tags.artwork.bytes).buffer], { type: tags.artwork.mime }) : undefined;
-    await render();
-  }
+  const libItems = $derived(
+    recents.map((e) => {
+      const t = (e.run as { track?: import("./lib/v3").Track } | null)?.track;
+      return t ? { ...fromTrack(t), id: `upload:${e.id}`, artId: t.id, kind: "upload" as const, libraryId: e.id } : fromLibrary(e);
+    }),
+  );
 
-  async function render(extra: Partial<ProcessRequest> = {}, viaCache = false) {
-    if (status !== "online") {
-      error = "The server is not reachable. Open Settings to check its address.";
-      return;
-    }
-    error = null;
-    abort = new AbortController();
-    const signal = abort.signal;
-    const ac = audio();
-    void ac.resume().catch(() => undefined);
-    const req = request(extra);
-    try {
-      let out: ProcessOutput;
-      phase = "processing";
-      stages = [];
-      if (viaCache && trackId) {
-        out = await runRerender(backend, trackId, req, (o) => o[0]?.stages && (stages = o[0].stages), signal);
-      } else {
-        if (!file) return;
-        let path: string;
-        if (uploaded && uploaded.file === file && uploaded.backend === backend && Date.now() - uploaded.at < UPLOAD_REUSE_MS) {
-          path = uploaded.path;
-        } else {
-          phase = "uploading";
-          upload = 0;
-          path = await uploadFile(backend, file, (fr) => (upload = fr), signal);
-          uploaded = { file, path, at: Date.now(), backend };
-          phase = "processing";
-        }
-        out = await runProcess(backend, path, file.name, req, (o) => o[0]?.stages && (stages = o[0].stages), signal);
-      }
-      const [progress, original, spatial, stems] = out;
-      if (progress.error || !original || !spatial) throw new BackendError(progress.error ?? "The server sent no audio.", "server");
-      phase = "downloading";
-      const files = [original, spatial, ...(stems ?? [])];
-      const blobs = await Promise.all(files.map(async (fd) => new Blob([await fetchArrayBuffer(fileUrl(backend, fd), signal)], { type: "audio/flac" })));
-      const names = (stems ?? []).map((fd) => fd.path.split("/").pop()!.replace(/\.flac$/, ""));
-      const objects = Object.fromEntries(names.map((n, i) => [n, blobs[2 + i]]));
-      report = progress.report ?? null;
-      plan = (progress.plan as Plan) ?? null;
-      editedPlan = null;
-      trackId = progress.track_id ?? null;
-      renderedAt = Date.now();
-      const g = progress.run as unknown as { analysis?: { genre?: { genre?: string | null } } } | undefined;
-      const gid = g?.analysis?.genre?.genre ?? null;
-      detectedGenre = gid ? (GENRES.find((x) => x.id === gid)?.label ?? gid) : null;
-      downloads = [
-        { label: "Spatial FLAC", url: URL.createObjectURL(blobs[1]), file: `${title} (SoundStage).flac` },
-        ...(progress.files?.plan ? [{ label: "plan.json", url: fileUrl(backend, { path: progress.files.plan }), file: "plan.json" }] : []),
-        ...(progress.files?.bed_7_1_4 ? [{ label: "7.1.4 WAV", url: fileUrl(backend, { path: progress.files.bed_7_1_4 }), file: "bed_7_1_4.wav" }] : []),
-      ];
-      applied = { space, character, motion, genre };
-      await load(blobs[0], blobs[1], objects);
-      const entry: LibraryEntry = {
-        id: `${trackId ?? "local"}-${space}-${character}-${motion}-${genre}`,
-        name: file?.name ?? title,
-        title,
-        artist,
-        createdAt: Date.now(),
-        original: blobs[0],
-        spatial: blobs[1],
-        objects,
-        artwork: artworkBlob,
-        run: progress.run,
-        report,
-        plan,
-        trackId,
-        space,
-        durationS: player?.duration ?? 0,
-      };
-      void saveEntry(entry).then(refreshRecents);
-      sheet = "player";
-    } catch (e) {
-      if (!(e instanceof BackendError && e.kind === "cancelled")) error = e instanceof Error ? e.message : String(e);
-    } finally {
-      phase = "idle";
-      abort = null;
-    }
-  }
+  // --- Opening a track ----------------------------------------------------------------------
 
-  async function load(original: Blob, spatial: Blob, objects: Record<string, Blob>, keepTime = true) {
-    const ac = audio();
-    const at = keepTime && player ? player.currentTime : 0;
-    const wasPlaying = keepTime && playing;
-    const [ob, sb, ...stemBufs] = await Promise.all([original, spatial, ...Object.values(objects)].map(async (b) => ac.decodeAudioData(await b.arrayBuffer())));
-    const stemMap = Object.fromEntries(Object.keys(objects).map((k, i) => [k, stemBufs[i]]));
+  function reset() {
+    abort?.abort();
+    abort = null;
+    runToken++;
+    cancelAnimationFrame(raf);
     player?.dispose();
-    player = new SyncPlayer(ac, { original: ob, spatial: sb, stems: stemMap });
-    player.onended = () => (playing = false);
-    player.setSide(side);
-    channels = Array.from({ length: ob.numberOfChannels }, (_, i) => ob.getChannelData(i));
-    levels = Object.fromEntries(Object.entries(stemMap).map(([k, b]) => [k, levelEnvelope(b)]));
-    const low = stemMap["low_end"] ?? ob;
-    haptic = new HapticFeel(lowOnsets(low.getChannelData(0), low.sampleRate));
-    conditions = [
-      { id: "original", label: "Original", buffer: ob },
-      { id: "v2", label: "SoundStage v2", buffer: sb },
-    ];
-    await applyPalette();
-    setMediaSession({ title, artist, artworkUrl }, {
-      play: () => void playPause(true),
-      pause: () => void playPause(false),
-      seek: (t) => void player?.seek(t),
-      position: () => ({ t: player?.currentTime ?? 0, duration: player?.duration ?? 0 }),
-    });
-    if (at > 0) await player.seek(at);
-    if (wasPlaying) await playPause(true);
+    player = null;
+    playing = buffering = false;
+    time = duration = readyUntil = 0;
+    job = null;
+    uploading = null;
+    error = null;
+    plan = null;
+    guard = null;
+    downloads = [];
+    conditions = [];
+    originalBuf = null;
+    originalBlob = null;
+    fetched = new Set();
+    haptic = null;
   }
 
-  async function applyPalette() {
-    const root = document.documentElement.style;
-    if (!artworkUrl) {
-      root.removeProperty("--accent");
-      root.removeProperty("--accent-2");
-      return;
+  function attach(buf: AudioBuffer) {
+    const p = new StreamPlayer(audio(), buf);
+    p.setSide(side);
+    p.onended = () => {
+      playing = false;
+      if (index < queue.length - 1) void open(index + 1);
+    };
+    p.onbuffering = (b) => (buffering = b);
+    player = p;
+    originalBuf = buf;
+    duration = buf.duration;
+    if (canVibrate()) {
+      haptic = new HapticFeel(lowOnsets(buf.getChannelData(0), buf.sampleRate));
+      haptic.enabled = feel;
     }
+    loop();
+  }
+
+  function loop() {
+    cancelAnimationFrame(raf);
+    const step = () => {
+      if (player) {
+        time = player.currentTime;
+        readyUntil = player.readyUntil;
+        playing = player.isPlaying;
+        haptic?.tick(time);
+        setPlaybackState(playing, time, duration);
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+  }
+
+  async function decodeInto(buf: ArrayBuffer): Promise<AudioBuffer> {
+    return await audio().decodeAudioData(buf.slice(0));
+  }
+
+  /** Fetch, decode, trim and hand over every segment the job has announced, in order. */
+  async function pump(state: JobState, token: number) {
+    if (pumping) return;
+    pumping = true;
     try {
-      const { extractPalette } = await import("./lib/palette");
-      const p = await extractPalette(artworkUrl);
-      if (p) {
-        root.setProperty("--accent", p.accent);
-        root.setProperty("--accent-2", p.accent2);
+      for (const seg of state.segments ?? []) {
+        if (token !== runToken || fetched.has(seg.index) || !state.id) continue;
+        if (!player) return; // wait until the original is decoded; the next snapshot retries
+        fetched.add(seg.index);
+        const data = await fetchArrayBuffer(jobs.segmentUrl(backend, state.id, seg.file), abort?.signal);
+        const dec = await decodeInto(data);
+        if (token !== runToken) return;
+        player.addSegment(seg.index, trimBuffer(audio(), dec, seg));
+        if (seg.index === 0) {
+          side = "spatial";
+          void player.play();
+        }
+      }
+    } catch (e) {
+      if (!(e instanceof BackendError && e.kind === "cancelled")) error = "A part of the render could not be fetched.";
+    } finally {
+      pumping = false;
+    }
+  }
+
+  function onState(s: JobState, token: number) {
+    if (token !== runToken) return;
+    job = s;
+    if (s.plan) plan = s.plan as Plan3;
+    if (s.error) error = s.error;
+    void pump(s, token);
+    if (s.done && s.status === "done") void finish(s, token);
+  }
+
+  async function finish(s: JobState, token: number) {
+    // Wait for the last segments, then keep the whole render on this device.
+    for (let i = 0; i < 100 && pumping; i++) await new Promise((r) => setTimeout(r, 100));
+    await pump(s, token);
+    if (token !== runToken || !s.id) return;
+    player?.setComplete();
+    guard = s.guard ? { ...s.guard, coverage: (s as { coverage?: never }).coverage ?? null } : null;
+    downloads = [
+      { label: "FLAC", url: jobs.fileUrl(backend, s.id, "spatial.flac"), file: `${current?.title ?? "song"}-spatial.flac` },
+      { label: "Plan", url: jobs.fileUrl(backend, s.id, "plan.json"), file: "plan.json" },
+    ];
+    try {
+      const rep = await fetch(jobs.fileUrl(backend, s.id, "report.json")).then((r) => r.json());
+      guard = { verdict: rep.verdict, reasons: rep.reasons, coverage: rep.coverage ?? null };
+      const flac = await fetch(jobs.fileUrl(backend, s.id, "spatial.flac")).then((r) => r.blob());
+      if (originalBlob && current) {
+        await saveEntry({
+          id: crypto.randomUUID(), name: current.title, title: current.title, artist: current.artist,
+          createdAt: Date.now(), original: originalBlob, spatial: flac, objects: {},
+          // Plain copies: state proxies cannot be stored in IndexedDB.
+          run: JSON.parse(JSON.stringify({ track: current.track ?? null, run: s.run ?? null })),
+          report: rep, plan: s.plan, trackId: s.id, space: "dry_stage", durationS: duration,
+        });
+        await refreshLibrary();
       }
     } catch {
-      // A broken image keeps the brand colours.
+      // Saving is a convenience: the song keeps playing without it.
+    }
+    if (player && originalBuf) {
+      conditions = [{ id: "original", label: "Original", buffer: originalBuf }];
     }
   }
 
-  async function playPause(force?: boolean) {
-    if (!player) return;
-    const want = force ?? !playing;
-    if (want) {
-      await player.play();
-      haptic?.reset(player.currentTime);
-    } else player.pause();
-    playing = player.isPlaying;
-    setPlaybackState(playing, player.currentTime, player.duration);
+  async function open(i: number, items: Item[] = queue) {
+    const it = items[i];
+    if (!it) return;
+    audio();
+    void ctx?.resume();
+    reset();
+    queue = items;
+    index = i;
+    current = it;
+    sheet = "player";
+    Player ??= (await import("./components/NowPlaying.svelte")).default;
+    const token = runToken;
+    const ac = new AbortController();
+    abort = ac;
+    try {
+      if (it.kind === "upload" && it.libraryId) {
+        const e = await getEntry(it.libraryId);
+        if (!e) throw new Error("That saved render is gone from this device.");
+        const [o, s] = await Promise.all([decodeInto(await e.original.arrayBuffer()), decodeInto(await e.spatial.arrayBuffer())]);
+        if (token !== runToken) return;
+        originalBlob = e.original;
+        attach(o);
+        player?.addSegment(0, s);
+        player?.setComplete();
+        plan = e.plan as Plan3;
+        const rep = e.report as { verdict: "pass" | "review" | "fail"; reasons: string[] } | null;
+        guard = rep ? { verdict: rep.verdict, reasons: rep.reasons } : null;
+        conditions = [{ id: "original", label: "Original", buffer: o }, { id: "v3", label: "SoundStage v3", buffer: s }];
+        void player?.play();
+        return;
+      }
+      if (status !== "online") throw new Error("The server is not reachable, so this track cannot be rendered now.");
+      const track = it.track!;
+      const fmt = pickFormat(formats);
+      const opts: JobOptions = { preset: "fast", head, fmt };
+      const origPromise = fetchArrayBuffer(catalog.audioUrl(backend, track.id), ac.signal).then(async (data) => {
+        originalBlob = new Blob([data], { type: "audio/mpeg" });
+        const buf = await decodeInto(data);
+        if (token === runToken) {
+          attach(buf);
+          if (job) void pump(job, token);
+        }
+      });
+      const jobPromise = streamJob(backend, "v3_catalog", [track.id, optionsJson(opts)], (s) => onState(s, token), ac.signal);
+      await Promise.all([origPromise, jobPromise]);
+    } catch (e) {
+      if (token === runToken && !(e instanceof BackendError && e.kind === "cancelled")) {
+        error = e instanceof Error ? e.message : "That did not work.";
+      }
+    }
   }
 
+  async function startUpload(file: File, o: JobOptions) {
+    audio();
+    void ctx?.resume();
+    reset();
+    const token = runToken;
+    const ac = new AbortController();
+    abort = ac;
+    const tags = await readTags(file).catch(() => ({ title: "", artist: "", artwork: undefined }));
+    const art = makeArtworkUrl(tags.artwork) ?? "";
+    current = { id: `local:${file.name}:${file.size}`, title: tags.title || file.name.replace(/\.[^.]+$/, ""), artist: tags.artist || "Your upload", artworkUrl: art, durationS: 0, kind: "upload" };
+    queue = [current];
+    index = 0;
+    originalBlob = file;
+    Player ??= (await import("./components/NowPlaying.svelte")).default;
+    try {
+      const decoded = decodeInto(await file.arrayBuffer()).then((buf) => {
+        if (token === runToken) {
+          attach(buf);
+          if (job) void pump(job, token);
+        }
+      });
+      uploading = 0;
+      const path = await uploadFile(backend, file, (f) => (uploading = f), ac.signal);
+      uploading = null;
+      const opts = { ...o, fmt: pickFormat(formats) };
+      const data = [{ path, orig_name: file.name, meta: { _type: "gradio.FileData" } }, optionsJson(opts)];
+      let opened = false;
+      await Promise.all([decoded, streamJob(backend, "v3_process", data, (s) => {
+        onState(s, token);
+        if (!opened && (s.segments?.length ?? 0) > 0) {
+          opened = true;
+          sheet = "player";
+        }
+      }, ac.signal)]);
+    } catch (e) {
+      uploading = null;
+      if (token === runToken && !(e instanceof BackendError && e.kind === "cancelled")) {
+        error = e instanceof Error ? e.message : "That did not work.";
+      }
+    }
+  }
+
+  function cancelJob() {
+    reset();
+    current = null;
+  }
+
+  // --- Controls -----------------------------------------------------------------------------
+
+  async function toggle() {
+    if (!player) return;
+    if (player.isPlaying) player.pause();
+    else await player.play();
+    playing = player.isPlaying;
+  }
+  async function seek(t: number) {
+    await player?.seek(t);
+    haptic?.reset(t);
+    time = t;
+  }
   function setSide(s: Side) {
     side = s;
     player?.setSide(s);
   }
-
-  function tick() {
-    if (player) {
-      const t = player.currentTime;
-      if (t < time - 0.5) haptic?.reset(t);
-      time = t;
-      if (haptic) {
-        haptic.enabled = feel && playing;
-        haptic.intensity = feelIntensity;
-        haptic.tick(t);
-      }
+  function setFeel() {
+    feel = !feel;
+    if (haptic) {
+      haptic.enabled = feel;
+      haptic.reset(time);
     }
-    raf = requestAnimationFrame(tick);
   }
 
-  async function openRecent(id: string) {
-    const e = await getEntry(id);
-    if (!e) return refreshRecents();
-    title = e.title ?? e.name;
-    artist = e.artist;
-    if (artworkUrl) URL.revokeObjectURL(artworkUrl);
-    artworkUrl = e.artwork ? URL.createObjectURL(e.artwork) : null;
-    artworkBlob = e.artwork;
-    report = e.report as GuardReport | null;
-    plan = e.plan as Plan | null;
-    trackId = e.trackId;
-    renderedAt = e.createdAt;
-    space = (e.space as SpaceName) ?? "studio";
-    applied = { space, character, motion, genre };
-    downloads = [{ label: "Spatial FLAC", url: URL.createObjectURL(e.spatial), file: `${title} (SoundStage).flac` }];
-    file = null;
-    await load(e.original, e.spatial, e.objects, false);
-    sheet = "player";
+  function cycleTheme() {
+    theme = theme === "system" ? "light" : theme === "light" ? "dark" : "system";
+    setTheme(theme);
+  }
+  function setTheme(t: ThemeChoice) {
+    theme = t;
+    saveChoice(t);
+    stopTheme();
+    stopTheme = initTheme(t);
   }
 
-  async function refreshRecents() {
-    recents = await listRecent();
+  async function removeItem(it: Item) {
+    if (!it.libraryId) return;
+    await removeEntry(it.libraryId);
+    await refreshLibrary();
   }
 
+  async function openCalibration() {
+    CalibrationC ??= (await import("./components/Calibration.svelte")).default;
+    sheet = "calibrate";
+  }
   async function openTest() {
+    BlindTest ??= (await import("./components/BlindTest.svelte")).default;
     sheet = "test";
-    if (!BlindTest) BlindTest = (await import("./components/BlindTest.svelte")).default;
   }
 
-  async function addV1() {
-    if (!trackId || !player) return;
-    addingV1 = true;
-    try {
-      const out = await runRerender(backend, trackId, { ...request(), mode: "lite", profile: "max" }, () => undefined);
-      const fd = out[2];
-      if (fd) {
-        const buf = await audio().decodeAudioData(await fetchArrayBuffer(fileUrl(backend, fd)));
-        conditions = [...conditions, { id: "v1", label: "SoundStage v1", buffer: buf }];
-      }
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-    } finally {
-      addingV1 = false;
-    }
-  }
-
-  function key(e: KeyboardEvent) {
-    const target = e.target as HTMLElement;
-    if (!player || ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)) return;
-    if (e.key === " " && target.tagName !== "BUTTON") {
+  function onKey(e: KeyboardEvent) {
+    const el = e.target as HTMLElement | null;
+    if (!current || el?.closest("input, textarea, select, [contenteditable]")) return;
+    if (e.code === "Space" && !el?.closest("button, a")) {
       e.preventDefault();
-      void playPause();
-    } else if (e.key === "s" || e.key === "S") setSide(side === "spatial" ? "original" : "spatial");
-    else if (e.key === "ArrowLeft" && target.tagName !== "CANVAS") void player.seek(Math.max(0, time - 5));
-    else if (e.key === "ArrowRight" && target.tagName !== "CANVAS") void player.seek(Math.min(player.duration, time + 5));
-    else if (e.key === "[") void player.setLoop({ start: time, end: player.loopRegion?.end ?? player.duration });
-    else if (e.key === "]") void player.setLoop({ start: player.loopRegion?.start ?? 0, end: time });
-    else if (e.key === "l" || e.key === "L") void player.setLoop(null);
+      void toggle();
+    } else if (e.key === "ArrowRight") void seek(Math.min(duration, time + 5));
+    else if (e.key === "ArrowLeft") void seek(Math.max(0, time - 5));
+    else if (e.key.toLowerCase() === "o") setSide(side === "spatial" ? "original" : "spatial");
   }
 
-  onMount(() => {
-    void check();
-    void refreshRecents();
-    raf = requestAnimationFrame(tick);
+  $effect(() => {
+    if (!current) return;
+    setMediaSession(
+      { title: current.title, artist: current.artist, artworkUrl: current.artworkUrl || null },
+      { play: () => void toggle(), pause: () => void toggle(), seek: (t) => void seek(t), position: () => ({ t: time, duration }) },
+    );
   });
 
+  onMount(() => {
+    stopTheme = initTheme(theme);
+    void check();
+    void refreshLibrary();
+  });
   onDestroy(() => {
+    stopTheme();
     cancelAnimationFrame(raf);
     player?.dispose();
   });
+
+  const renderProgress = $derived.by(() => {
+    const j = job as JobState | null;
+    const p = player as StreamPlayer | null;
+    return j?.chunks_total ? (j.chunks_done ?? 0) / j.chunks_total : p?.isComplete ? 1 : 0;
+  });
+  const spatialReady = $derived.by(() => {
+    const p = player as StreamPlayer | null;
+    return !!p && (p.isComplete || readyUntil >= time + 1);
+  });
 </script>
 
-<svelte:window onkeydown={key} />
+<svelte:window onkeydown={onKey} />
+<a class="skip" href="#main">Skip to the content</a>
 
-<main class="app">
-  <header class="top">
-    <a class="brand" href="/" aria-label="SoundStage home"><Logo size={30} /><span>SoundStage</span></a>
-    <div class="top-actions">
-      <span class={`status ${status}`} title={status === "online" ? "Server ready" : status === "checking" ? "Checking the server" : "Server not reachable"}>
-        <span class="sr-only">Server {status}</span>
-      </span>
-      <button class="btn icon ghost" type="button" onclick={() => (sheet = "about")} aria-label="About SoundStage"><Icon name="info" /></button>
-      <button class="btn icon ghost" type="button" onclick={() => (sheet = "settings")} aria-label="Settings"><Icon name="settings" /></button>
-    </div>
-  </header>
+<TabBar {tab} {theme} onselect={(t) => { tab = t; browseGenre = ""; }} ontheme={cycleTheme} oncredits={() => (creditsOpen = true)} />
 
-  <section class="hero">
-    <p class="eyebrow">Spatial audio for any song, on any phone</p>
-    <h1>Step inside<br />the record.</h1>
-    <p class="muted lede">Drop a song you own. SoundStage builds a stage around you from its own parts, keeps the vocal and the bass where the artist put them, and checks the result against the original.</p>
-  </section>
-
-
-  {#if busy}
-    <ProgressPanel phase={phase === "idle" ? "processing" : phase} {upload} {stages} oncancel={() => abort?.abort()} />
-  {:else}
-    <DropZone disabled={status !== "online"} onfile={pick} />
-    <div class="options">
-      <label class="check"><input type="checkbox" bind:checked={quick} /> Quick render <span class="faint">(no separation: faster, fewer parts)</span></label>
-      <label class="space">Space
-        <select bind:value={space}>
-          {#each Object.entries(SPACE_INFO) as [id, info] (id)}<option value={id}>{info.label}</option>{/each}
-        </select>
-      </label>
-    </div>
-  {/if}
-
-  <!-- Below the drop zone, so the page does not jump when the server turns out to be asleep. -->
-  {#if status === "offline" && diagnosis}
-    <section class="notice glass" role="alert">
-      <Icon name="alert" />
-      <div>
-        <p><strong>{diagnosis.title}</strong></p>
-        <p class="muted small">{diagnosis.detail}</p>
-        <ul class="small">
-          {#each diagnosis.fixes as f (f)}<li>{f}</li>{/each}
-        </ul>
-        <button class="btn" type="button" onclick={check}><Icon name="refresh" size={16} /> Check again</button>
-      </div>
-    </section>
-  {/if}
-  {#if error}
-    <p class="error" role="alert"><Icon name="alert" size={18} /> {error}</p>
-  {/if}
-
-  {#if recents.length}
-    <section class="recents">
-      <h2>On this phone</h2>
-      <ul>
-        {#each recents as r (r.id)}
-          <li class="glass">
-            <button class="recent" type="button" onclick={() => openRecent(r.id)}>
-              <span class="thumb">{#if r.artwork}<img src={URL.createObjectURL(r.artwork)} alt="" />{:else}<Logo size={26} title="" />{/if}</span>
-              <span class="meta">
-                <span class="name">{r.title ?? r.name}</span>
-                <span class="faint small">{SPACE_INFO[r.space as SpaceName]?.label ?? r.space} · {new Date(r.createdAt).toLocaleDateString()}</span>
-              </span>
-            </button>
-            <button class="btn icon ghost" type="button" aria-label={`Remove ${r.title ?? r.name}`} onclick={() => removeEntry(r.id).then(refreshRecents)}><Icon name="trash" size={18} /></button>
-          </li>
-        {/each}
-      </ul>
-    </section>
-  {/if}
-
-  <footer class="foot faint small">
-    <p>Tracks are processed on the server and deleted after 30 minutes. Use music you own or may use.</p>
-  </footer>
-</main>
-
-{#if player && sheet !== "player"}
-  <button class="mini glass" type="button" onclick={() => (sheet = "player")} aria-label={`Open the player: ${title}`}>
-    <span class="thumb">{#if artworkUrl}<img src={artworkUrl} alt="" />{:else}<Logo size={24} title="" />{/if}</span>
-    <span class="name">{title}</span>
-    <span class="side">{side === "spatial" ? "Spatial" : "Original"}</span>
-    <span
-      class="mini-play"
-      role="button"
-      tabindex="0"
-      aria-label={playing ? "Pause" : "Play"}
-      onclick={(e) => {
-        e.stopPropagation();
-        void playPause();
-      }}
-      onkeydown={(e) => {
-        if (e.key === "Enter") {
-          e.stopPropagation();
-          void playPause();
-        }
-      }}><Icon name={playing ? "pause" : "play"} size={22} /></span>
-  </button>
+{#if tab === "home"}
+  <Home
+    recents={libItems.slice(0, 8)}
+    {shelves}
+    {status}
+    onplay={(i, q) => open(Math.max(0, q.findIndex((x) => x.id === i.id)), q)}
+    onbrowse={(g) => { browseGenre = g ?? ""; tab = "browse"; }}
+    oncreate={() => (tab = "create")}
+  />
+{:else if tab === "browse"}
+  <Browse {backend} {shelves} initial={browseGenre} onplay={(i, q) => open(Math.max(0, q.findIndex((x) => x.id === i.id)), q)} />
+{:else if tab === "library"}
+  <Library items={libItems} {sizes} onplay={(i, q) => open(Math.max(0, q.findIndex((x) => x.id === i.id)), q)} onremove={removeItem} oncreate={() => (tab = "create")} />
+{:else}
+  <Create {job} {uploading} {head} {error} onstart={startUpload} oncancel={cancelJob} oncalibrate={openCalibration} />
 {/if}
 
-<Sheet open={sheet === "player" && !!player} title={title || "Now playing"} full bare onclose={() => (sheet = "none")}>
-  {#if player}
-    <NowPlaying
-      {player}
-      {channels}
-      {title}
-      {artist}
-      {artworkUrl}
-      {report}
-      plan={editedPlan ?? plan}
-      {detectedGenre}
-      {downloads}
-      {levels}
-      {time}
-      {playing}
-      {side}
-      bind:space
-      bind:character
-      bind:motion
-      bind:genre
-      bind:feel
-      bind:feelIntensity
-      {dirty}
-      {busy}
-      {canRerender}
-      onapply={() => render({}, true)}
-      onplan={(p) => (editedPlan = p)}
-      onrerenderplan={() => render({ plan: editedPlan ?? plan ?? undefined }, true)}
-      onclose={() => (sheet = "none")}
-      onplay={() => playPause()}
-      onside={setSide}
-      onblindtest={openTest}
+{#if current && sheet !== "player"}
+  <MiniPlayer item={current} {playing} busy={buffering || (!player && !error)} {side} {time} {duration} onopen={() => (sheet = "player")} ontoggle={toggle} />
+{/if}
+
+<!-- A sheet closed from code fires its close event too; only act when it is still the one showing. -->
+<Sheet open={sheet === "player"} title="Now playing" full bare onclose={() => sheet === "player" && (sheet = "none")}>
+  {#if current && Player}
+    <Player
+      item={current} {queue} {index} {playing} busy={!player && !error} {buffering} {time} {duration} {readyUntil}
+      {renderProgress} {spatialReady} {side} {plan} {guard} {feel} canFeel={canVibrate()} {downloads}
+      onclose={() => (sheet = "none")} ontoggle={toggle} onseek={seek} onside={setSide}
+      onprev={() => open(index - 1)} onnext={() => open(index + 1)} onpick={(i) => open(i)}
+      onfeel={setFeel} oncalibrate={openCalibration}
     />
-    {#if busy}<div class="overlay"><ProgressPanel phase={phase === "idle" ? "processing" : phase} {upload} {stages} oncancel={() => abort?.abort()} /></div>{/if}
+    {#if error}<p role="alert" class="err">{error}</p>{/if}
   {/if}
 </Sheet>
 
-<Sheet open={sheet === "about"} title="Why SoundStage" onclose={() => (sheet = "none")}>
-  <About />
+<Sheet open={sheet === "calibrate"} title="Fit to my ears" onclose={() => sheet === "calibrate" && (sheet = current ? "player" : "none")}>
+  {#if CalibrationC}
+    <CalibrationC {backend} ondone={(h) => { head = h; sheet = current ? "player" : "none"; }} onclose={() => (sheet = current ? "player" : "none")} />
+  {/if}
 </Sheet>
 
-<Sheet open={sheet === "settings"} title="Settings" onclose={() => (sheet = "none")}>
-  <form
-    class="settings"
-    onsubmit={(e) => {
-      e.preventDefault();
-      backend = saveBackendUrl(backendDraft);
-      uploaded = null;
-      void check();
-    }}
-  >
-    <label class="field">
-      <span class="field-label">Server address</span>
-      <input class="input" type="url" bind:value={backendDraft} autocomplete="off" spellcheck="false" />
-    </label>
-    <p class="faint small">The SoundStage server that renders your tracks. Status: {status}.</p>
-    <button class="btn primary" type="submit">Save and check</button>
-  </form>
-</Sheet>
-
-<Sheet open={sheet === "test"} title="Blind test" onclose={() => (sheet = "player")}>
-  {#if BlindTest && conditions.length && audio()}
-    <BlindTest ctx={audio()} track={title} {conditions} onaddv1={canRerender ? addV1 : undefined} {addingV1} />
+<Sheet open={sheet === "test"} title="Listening test" onclose={() => sheet === "test" && (sheet = "none")}>
+  {#if BlindTest && conditions.length && ctx && current}
+    <BlindTest {ctx} track={current.title} {conditions} />
   {:else}
-    <p class="muted">Render a track first; the test compares its versions.</p>
+    <p class="muted">Play a song to the end of its render first: the test compares what you just heard.</p>
   {/if}
+</Sheet>
+
+<Sheet open={creditsOpen} title="Credits and settings" onclose={() => (creditsOpen = false)}>
+  <Credits {backend} {theme} onbackend={(u) => { backend = saveBackendUrl(u); void check(); }} ontheme={setTheme} ontest={openTest} />
 </Sheet>
 
 <style>
-  .app {
-    max-width: 640px;
-    margin: 0 auto;
-    padding: max(var(--gap-4), env(safe-area-inset-top)) var(--gap-4) calc(120px + env(safe-area-inset-bottom));
-    display: grid;
-    gap: var(--gap-6);
-  }
-
-  .top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .brand {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--gap-2);
-    color: var(--ivory);
-    text-decoration: none;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-  }
-
-  .top-actions {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-  }
-
-  .status {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: var(--gap-2);
-    background: var(--ivory-3);
-  }
-
-  .status.online {
-    background: var(--lagoon);
-    box-shadow: 0 0 10px var(--lagoon);
-  }
-
-  .status.offline {
-    background: var(--coral);
-  }
-
-  .hero {
-    display: grid;
-    gap: var(--gap-4);
-    padding-top: var(--gap-5);
-  }
-
-  h1 {
-    font-size: var(--text-hero);
-  }
-
-  .lede {
-    font-size: var(--text-lg);
-    line-height: 1.4;
-    max-width: 34ch;
-  }
-
-  .options {
-    display: grid;
-    gap: var(--gap-3);
-    font-size: var(--text-sm);
-  }
-
-  .check {
-    display: flex;
-    gap: var(--gap-2);
-    align-items: center;
-  }
-
-  .check input {
-    width: 20px;
-    height: 20px;
-    accent-color: var(--lagoon);
-  }
-
-  .space {
-    display: grid;
-    gap: 6px;
-    color: var(--ivory-2);
-  }
-
-  .notice {
-    display: flex;
-    gap: var(--gap-3);
-    padding: var(--gap-4);
-    border-radius: var(--radius-md);
-  }
-
-  .notice ul {
-    padding-left: 1.1em;
-  }
-
-  .error {
-    display: flex;
-    gap: var(--gap-2);
-    align-items: flex-start;
-    color: var(--coral);
-  }
-
-  .small {
-    font-size: var(--text-xs);
-  }
-
-  .recents {
-    display: grid;
-    gap: var(--gap-3);
-  }
-
-  .recents h2 {
-    font-size: var(--text-xl);
-  }
-
-  .recents ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: var(--gap-2);
-  }
-
-  .recents li {
-    display: flex;
-    align-items: center;
-    padding: var(--gap-2);
-    border-radius: var(--radius-md);
-  }
-
-  .recent {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: var(--gap-3);
-    border: 0;
-    background: transparent;
-    text-align: left;
-    cursor: pointer;
-    min-height: 56px;
-  }
-
-  .thumb {
-    width: 48px;
-    height: 48px;
-    flex: none;
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-    display: grid;
-    place-items: center;
-    background: var(--ink-3);
-  }
-
-  .thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .meta {
-    display: grid;
-    min-width: 0;
-  }
-
-  .name {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .foot {
-    text-align: center;
-  }
-
-  .mini {
+  .skip {
     position: fixed;
     left: var(--gap-3);
-    right: var(--gap-3);
-    bottom: calc(var(--gap-3) + env(safe-area-inset-bottom));
-    z-index: 10;
-    max-width: 616px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    gap: var(--gap-3);
-    padding: var(--gap-2);
-    padding-right: var(--gap-3);
-    border-radius: var(--radius-lg);
-    cursor: pointer;
-    text-align: left;
-    animation: up var(--dur-3) var(--ease-out);
+    top: -60px;
+    z-index: 100;
+    padding: var(--gap-2) var(--gap-4);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    box-shadow: var(--shadow-2);
+    transition: top var(--dur-2) var(--ease);
   }
-
-  .mini .name {
-    flex: 1;
-    font-weight: 500;
+  .skip:focus {
+    top: var(--gap-3);
   }
-
-  .mini .side {
-    font-size: var(--text-xs);
-    color: var(--accent);
-  }
-
-  .mini-play {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    background: var(--ivory);
-    color: var(--ink);
-  }
-
-  .overlay {
-    position: fixed;
-    inset: auto var(--gap-4) var(--gap-4);
-    z-index: 20;
-  }
-
-  .settings {
-    display: grid;
-    gap: var(--gap-4);
-  }
-
-  @keyframes up {
-    from {
-      transform: translateY(20px);
-      opacity: 0;
-    }
+  .err {
+    color: var(--fail);
+    font-weight: 600;
+    padding: 0 var(--gap-5);
   }
 </style>

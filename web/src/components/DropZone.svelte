@@ -23,7 +23,7 @@
 
 <button
   type="button"
-  class="drop glass"
+  class="drop matte"
   class:over
   {disabled}
   onclick={() => input?.click()}
@@ -60,7 +60,7 @@
   }
 
   .drop.over {
-    border-color: var(--lagoon);
+    border-color: var(--accent);
     transform: scale(1.01);
   }
 
@@ -70,9 +70,9 @@
     border-radius: 50%;
     display: grid;
     place-items: center;
-    background: rgb(31 200 180 / 0.12);
-    color: var(--lagoon);
-    box-shadow: 0 0 0 10px rgb(31 200 180 / 0.05);
+    background: var(--accent-soft);
+    color: var(--accent);
+    box-shadow: 0 0 0 10px var(--accent-soft);
   }
 
   .title {
@@ -86,7 +86,7 @@
 
   .refused {
     margin-top: var(--gap-2);
-    color: var(--coral);
+    color: var(--fail);
     font-size: var(--text-sm);
   }
 </style>

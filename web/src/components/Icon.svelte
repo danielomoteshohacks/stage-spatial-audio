@@ -4,7 +4,8 @@
   export type IconName =
     | "play" | "pause" | "upload" | "close" | "chevron-up" | "chevron-down" | "loop" | "info"
     | "settings" | "stage" | "pulse" | "check" | "alert" | "download" | "refresh" | "headphones"
-    | "trash" | "flask" | "move" | "back" | "minus";
+    | "trash" | "flask" | "move" | "back" | "minus" | "home" | "compass" | "library" | "plus"
+    | "queue" | "next" | "prev" | "sun" | "moon" | "search" | "spatial" | "list" | "ear";
 
   let { name, size = 20, label }: { name: IconName; size?: number; label?: string } = $props();
 
@@ -30,8 +31,21 @@
     move: "M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3",
     back: "M15 6l-6 6 6 6",
     minus: "M6 12h12",
+    home: "M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-6h4v6",
+    compass: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM15.5 8.5l-2 5-5 2 2-5z",
+    library: "M5 4v16M10 4v16M15.5 5l3.5 14M3 20h18",
+    plus: "M12 5v14M5 12h14",
+    queue: "M4 7h12M4 12h12M4 17h7M18 14v6M15 17h6",
+    next: "M6 5.5v13l8-6.5zM17 5v14",
+    prev: "M18 5.5v13l-8-6.5zM7 5v14",
+    sun: "M12 16.5a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zM12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4",
+    moon: "M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z",
+    search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4",
+    spatial: "M12 12m-1.5 0a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0M7.5 7.5a6.4 6.4 0 0 0 0 9M16.5 7.5a6.4 6.4 0 0 1 0 9M4.5 4.5a10.6 10.6 0 0 0 0 15M19.5 4.5a10.6 10.6 0 0 1 0 15",
+    list: "M8 6h12M8 12h12M8 18h12M4 6v.01M4 12v.01M4 18v.01",
+    ear: "M7 10a5 5 0 0 1 10 0c0 3-3 3.5-3 6.5a2.5 2.5 0 0 1-5 0M10 10a2 2 0 0 1 4 0",
   };
-  const SOLID = new Set<IconName>(["play", "pause"]);
+  const SOLID = new Set<IconName>(["play", "pause", "next", "prev"]);
 </script>
 
 <svg

@@ -85,3 +85,25 @@ def test_bench_reports_real_time_factors(tmp_path):
     r = c.get("/v3/bench", params={"seconds": 4}).json()
     assert len(r["rows"]) == 4 and all(row["rtf"] > 0 for row in r["rows"])
     assert r["rows"][1]["run"] == "warm" and "convolve" in r["rows"][0]["stages"]
+
+
+def test_calibration_stimulus_is_directional_and_validated(tmp_path):
+    import io
+
+    import numpy as np
+    import soundfile as sf
+
+    from stage.server.calibration import create_calibration_router
+
+    app = FastAPI()
+    app.include_router(create_calibration_router())
+    c = TestClient(app)
+    assert c.get("/v3/calibration/heads").json()["default"] == "D1"
+    left = c.get("/v3/calibration/stimulus", params={"head": "D1", "az": 70, "el": 0})
+    assert left.status_code == 200
+    y, sr = sf.read(io.BytesIO(left.content), dtype="float32", always_2d=True)
+    assert sr == 48000 and y.shape[0] > 20000
+    # a source on the left is louder in the left ear
+    assert np.sum(y[:, 0] ** 2) > 1.5 * np.sum(y[:, 1] ** 2)
+    assert c.get("/v3/calibration/stimulus", params={"head": "nope"}).status_code == 400
+    assert c.get("/v3/calibration/stimulus", params={"az": 999}).status_code == 400

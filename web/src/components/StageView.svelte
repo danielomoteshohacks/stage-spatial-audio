@@ -1,338 +1,155 @@
 <script lang="ts">
-  // Every object of the plan around the listener's head, seen from above and behind. Positions
-  // follow the playhead with the backend's own formulas (lib/scene.ts); each disc pulses with
-  // its object stem's level. Drag a disc to move it on the floor, use the height slider for its
-  // elevation, then re-render. The lead vocal, the bass and the kit are locked, as in the plan.
+  // Every object of the plan around the listener, seen from above: front is up, left is left. A
+  // dot's distance from the centre is its distance, its size grows with height, and a ring marks
+  // the objects that have left the floor. Positions follow the playhead with the renderer's own
+  // rules (lib/scene3.ts), so a riser lifts the pads on screen as it does in your ears. Below the
+  // picture the same facts are a list, so the stage can be read without seeing it.
   import { onMount } from "svelte";
-  import { fromFloor, objectAt, toXYZ, type Plan, type PlanObject } from "../lib/scene";
-  import { STEM_LABELS } from "../lib/labels";
-  import Icon from "./Icon.svelte";
+  import { placeObjects, ROLE_LABELS, toScreen, type Plan3 } from "../lib/scene3";
 
-  let {
-    plan,
-    levels,
-    time,
-    busy = false,
-    onchange,
-    onrerender,
-  }: {
-    plan: Plan;
-    levels: Record<string, Float32Array>;
-    time: number;
-    busy?: boolean;
-    onchange: (p: Plan) => void;
-    onrerender: () => void;
-  } = $props();
-
-  const LEVEL_RATE = 50; // level frames per second (see levelEnvelope)
-  const TILT = (38 * Math.PI) / 180;
-  const MAX_DIST = 8;
+  let { plan, time }: { plan: Plan3; time: number } = $props();
 
   let canvas: HTMLCanvasElement | undefined = $state();
   let width = $state(320);
-  let height = $derived(Math.round(width * 0.78));
-  let selected: string | null = $state(null);
-  let dragging = false;
+  const height = $derived(Math.round(width * 0.9));
+  const placed = $derived(placeObjects(plan, time));
 
-  const COLOURS: Record<string, string> = { vocals: "#ff7a5c", drums: "#1fc8b4", bass: "#f4f1ea", other: "#f2c14e", mix: "#1fc8b4" };
+  const COLOURS: Record<string, string> = {
+    lead_vocal: "#c4432a", backing_vocal: "#d9822b", kick: "#0a8576", snare: "#0a8576", bass: "#55504a",
+    cymbals: "#0a8576", toms: "#0a8576", guitar: "#6a5acd", keys: "#3a7bd5", pad: "#a4568a", fx: "#c08a00",
+    other: "#6b655d", return: "#8a8f98",
+  };
 
-  function isBed(o: PlanObject): boolean {
-    return (o.source ?? "").endsWith(".ambient") && o.spread === 0;
-  }
-
-  function colour(o: PlanObject): string {
-    return COLOURS[(o.source ?? "mix.direct").split(".")[0]] ?? "#1fc8b4";
-  }
-
-  /** Display radius for a distance: logarithmic, so 0.7 m and 8 m both fit on a phone. */
-  function radiusFor(d: number): number {
-    return Math.log1p(d) / Math.log1p(MAX_DIST);
-  }
-
-  function project(az: number, el: number, dist: number): { x: number; y: number; depth: number } {
-    const r = radiusFor(dist);
-    const [x, y, z] = toXYZ(az, el, 1);
-    const k = Math.min(width, height) * 0.46;
-    const cx = width / 2;
-    const cy = height * 0.58;
-    return { x: cx + x * r * k, y: cy - z * r * k * Math.cos(TILT) - y * r * k * Math.sin(TILT) * 1.6, depth: z };
-  }
-
-  function level(name: string): number {
-    const env = levels[name];
-    if (!env || !env.length) return 0;
-    return env[Math.min(env.length - 1, Math.max(0, Math.floor(time * LEVEL_RATE)))];
+  function dirWord(az: number, el: number): string {
+    const side = Math.abs(az) < 15 ? "front" : Math.abs(az) > 150 ? "behind" : az > 0
+      ? (Math.abs(az) < 60 ? "front left" : Math.abs(az) < 120 ? "left" : "rear left")
+      : (Math.abs(az) < 60 ? "front right" : Math.abs(az) < 120 ? "right" : "rear right");
+    return el >= 25 ? `${side}, above` : el >= 8 ? `${side}, slightly raised` : side;
   }
 
   function draw() {
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
-    const g = canvas.getContext("2d");
+    const c = canvas;
+    if (!c) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    c.width = width * dpr;
+    c.height = height * dpr;
+    const g = c.getContext("2d");
     if (!g) return;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const cs = getComputedStyle(c);
+    const line = cs.getPropertyValue("--hairline-strong").trim() || "#ccc";
+    const text = cs.getPropertyValue("--text-3").trim() || "#777";
     g.clearRect(0, 0, width, height);
-    const k = Math.min(width, height) * 0.46;
     const cx = width / 2;
-    const cy = height * 0.58;
-    // Floor rings at 1, 2 and 4 m, drawn as ellipses in perspective.
+    const cy = height * 0.56;
+    const R = Math.min(width * 0.46, height * 0.5);
+    g.strokeStyle = line;
     g.lineWidth = 1;
-    for (const d of [1, 2, 4, 8]) {
-      const r = radiusFor(d) * k;
-      g.strokeStyle = `rgba(244, 241, 234, ${d === 8 ? 0.05 : 0.1})`;
+    for (const r of [1 / 3, 2 / 3, 1]) {
       g.beginPath();
-      g.ellipse(cx, cy, r, r * Math.cos(TILT), 0, 0, Math.PI * 2);
+      g.arc(cx, cy, R * r, 0, Math.PI * 2);
       g.stroke();
     }
-    // The listener: a head with a small mark for the front.
-    g.fillStyle = "rgba(244, 241, 234, 0.9)";
+    g.fillStyle = text;
+    g.font = "11px 'Instrument Sans', sans-serif";
+    g.textAlign = "center";
+    g.fillText("front", cx, cy - R - 6);
+    g.fillText("rear", cx, cy + R + 14);
+    // The listener.
     g.beginPath();
-    g.ellipse(cx, cy, 9, 9 * Math.cos(TILT) + 2, 0, 0, Math.PI * 2);
+    g.arc(cx, cy, 6, 0, Math.PI * 2);
+    g.fillStyle = cs.getPropertyValue("--text").trim() || "#222";
     g.fill();
-    g.fillStyle = "#1fc8b4";
-    g.beginPath();
-    g.moveTo(cx - 4, cy - 9);
-    g.lineTo(cx + 4, cy - 9);
-    g.lineTo(cx, cy - 16);
-    g.fill();
-    // Objects, far ones first so near ones draw on top.
-    const items = plan.stems
-      .map((o) => {
-        const p = objectAt(plan, o, time);
-        const pts = p.spread > 0
-          ? [project(p.az + p.spread / 2, p.el, p.dist), project(p.az - p.spread / 2, p.el, p.dist)]
-          : [project(p.az, p.el, p.dist)];
-        return { o, p, pts };
-      })
-      .sort((a, b) => b.pts[0].depth - a.pts[0].depth);
-    for (const { o, p, pts } of items) {
-      const c = colour(o);
-      const lv = level(o.name);
-      if (isBed(o)) {
-        // A bed object surrounds the listener (sides, rear and above), so it is a ring.
-        const r = radiusFor(p.dist) * k;
-        g.strokeStyle = c + Math.round(60 + 120 * lv).toString(16).padStart(2, "0");
-        g.lineWidth = 2 + 6 * lv;
-        g.setLineDash([6, 8]);
+    for (const o of placed) {
+      const col = COLOURS[o.role] ?? "#6b655d";
+      for (const f of o.feeds) {
+        const [dx, dy] = toScreen(f.az, o.kind === "return" ? 3 : o.dist, R);
+        const rad = 5 + Math.max(0, f.el) / 12;
+        g.globalAlpha = o.kind === "return" ? 0.4 : 0.92;
         g.beginPath();
-        g.ellipse(cx, cy - 10, r, r * Math.cos(TILT), 0, 0, Math.PI * 2);
-        g.stroke();
-        g.setLineDash([]);
-        continue;
-      }
-      const r = 7 + 14 * Math.sqrt(lv);
-      if (pts.length === 2) {
-        g.strokeStyle = c + "55";
-        g.lineWidth = 2;
-        g.beginPath();
-        g.moveTo(pts[0].x, pts[0].y);
-        g.lineTo(pts[1].x, pts[1].y);
-        g.stroke();
-      }
-      for (const pt of pts) {
-        const glow = g.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, r * 2.2);
-        glow.addColorStop(0, c + "aa");
-        glow.addColorStop(1, c + "00");
-        g.fillStyle = glow;
-        g.beginPath();
-        g.arc(pt.x, pt.y, r * 2.2, 0, Math.PI * 2);
+        g.arc(cx + dx, cy + dy, rad, 0, Math.PI * 2);
+        g.fillStyle = col;
         g.fill();
-        g.fillStyle = c;
-        g.beginPath();
-        g.arc(pt.x, pt.y, r * 0.55, 0, Math.PI * 2);
-        g.fill();
-      }
-      if (o.name === selected) {
-        g.strokeStyle = "#f4f1ea";
-        g.lineWidth = 2;
-        for (const pt of pts) {
+        if (f.el >= 25) {
+          g.globalAlpha = 0.8;
+          g.strokeStyle = col;
+          g.lineWidth = 1.5;
           g.beginPath();
-          g.arc(pt.x, pt.y, r * 0.55 + 5, 0, Math.PI * 2);
+          g.arc(cx + dx, cy + dy, rad + 4, 0, Math.PI * 2);
           g.stroke();
         }
       }
     }
+    g.globalAlpha = 1;
   }
 
   $effect(() => {
-    void [plan, time, width, selected];
+    void placed;
+    void width;
     draw();
   });
 
-  function hit(x: number, y: number): PlanObject | null {
-    let best: { o: PlanObject; d: number } | null = null;
-    for (const o of plan.stems) {
-      const p = objectAt(plan, o, time);
-      const pts = p.spread > 0 ? [project(p.az + p.spread / 2, p.el, p.dist), project(p.az - p.spread / 2, p.el, p.dist)] : [project(p.az, p.el, p.dist)];
-      for (const pt of pts) {
-        const d = Math.hypot(pt.x - x, pt.y - y);
-        if (d < 28 && (!best || d < best.d)) best = { o, d };
-      }
-    }
-    return best?.o ?? null;
-  }
-
-  function point(e: PointerEvent): { x: number; y: number } {
-    const rect = canvas!.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }
-
-  function update(name: string, patch: Partial<PlanObject>) {
-    onchange({ ...plan, stems: plan.stems.map((o) => (o.name === name ? { ...o, ...patch } : o)) });
-  }
-
-  function down(e: PointerEvent) {
-    const { x, y } = point(e);
-    const o = hit(x, y);
-    selected = o?.name ?? null;
-    if (o && !o.protected) {
-      dragging = true;
-      canvas!.setPointerCapture(e.pointerId);
-    }
-  }
-
-  function move(e: PointerEvent) {
-    if (!dragging || !selected) return;
-    const o = plan.stems.find((s) => s.name === selected);
-    if (!o) return;
-    const { x, y } = point(e);
-    const k = Math.min(width, height) * 0.46;
-    const fx = (x - width / 2) / k;
-    const fz = (height * 0.58 - y) / (k * Math.cos(TILT));
-    const r = Math.min(1, Math.hypot(fx, fz));
-    const { az } = fromFloor(fx, fz);
-    // Back from display radius to metres (inverse of radiusFor).
-    const dist = Math.max(0.5, Math.expm1(r * Math.log1p(MAX_DIST)));
-    update(o.name, { az: Math.round(az), dist: Math.round(dist * 10) / 10 });
-  }
-
-  function up() {
-    dragging = false;
-  }
-
-  function keyMove(e: KeyboardEvent) {
-    const o = plan.stems.find((s) => s.name === selected);
-    if (!o || o.protected) return;
-    const step = e.shiftKey ? 15 : 5;
-    if (e.key === "ArrowLeft") update(o.name, { az: Math.min(180, o.az + step) });
-    else if (e.key === "ArrowRight") update(o.name, { az: Math.max(-180, o.az - step) });
-    else if (e.key === "ArrowUp") update(o.name, { dist: Math.max(0.5, Math.round((o.dist - 0.2) * 10) / 10) });
-    else if (e.key === "ArrowDown") update(o.name, { dist: Math.min(MAX_DIST, Math.round((o.dist + 0.2) * 10) / 10) });
-    else return;
-    e.preventDefault();
-  }
-
-  let sel = $derived(plan.stems.find((o) => o.name === selected) ?? null);
-
   onMount(() => {
-    const ro = new ResizeObserver(([entry]) => (width = Math.round(entry.contentRect.width)));
-    ro.observe(canvas!.parentElement!);
+    const ro = new ResizeObserver((es) => {
+      width = Math.max(240, Math.round(es[0].contentRect.width));
+    });
+    if (canvas?.parentElement) ro.observe(canvas.parentElement);
     return () => ro.disconnect();
   });
 </script>
 
-<div class="stage">
-  <canvas
-    bind:this={canvas}
-    style:width={`${width}px`}
-    style:height={`${height}px`}
-    tabindex="0"
-    aria-label="Stage view: objects around your head. Tap one to select it, drag to move it; arrow keys move the selected object."
-    onpointerdown={down}
-    onpointermove={move}
-    onpointerup={up}
-    onpointercancel={up}
-    onkeydown={keyMove}
-  ></canvas>
-
-  <ul class="legend" aria-label="Objects">
-    {#each plan.stems as o (o.name)}
+<div class="stage matte">
+  <canvas bind:this={canvas} style:width="{width}px" style:height="{height}px" aria-hidden="true"></canvas>
+  <ul class="legend" aria-label="Where each part is now">
+    {#each placed.filter((p) => p.kind === "object") as o (o.name)}
       <li>
-        <button type="button" class:on={o.name === selected} onclick={() => (selected = o.name)}>
-          <span class="swatch" style:background={colour(o)}></span>
-          {STEM_LABELS[o.name] ?? o.name}
-          {#if o.protected}<span class="faint">locked</span>{/if}
-          {#if o.motion}<span class="faint">moving</span>{/if}
-          {#if isBed(o)}<span class="faint">all around</span>{/if}
-        </button>
+        <span class="dot" style:background={COLOURS[o.role] ?? "#6b655d"}></span>
+        <span class="n">{ROLE_LABELS[o.role] ?? o.name}{o.protected ? " (fixed)" : ""}</span>
+        <span class="w">{dirWord(o.az, o.el)}</span>
       </li>
     {/each}
+    {#if placed.some((p) => p.kind === "return")}
+      <li><span class="dot ret"></span><span class="n">The record's reverb</span><span class="w">around and above</span></li>
+    {/if}
   </ul>
-
-  {#if sel}
-    <div class="selected glass">
-      <p><strong>{STEM_LABELS[sel.name] ?? sel.name}</strong>
-        <span class="faint">{sel.az > 0 ? `${sel.az} degrees left` : sel.az < 0 ? `${-sel.az} degrees right` : "centre"}, {sel.dist} m</span></p>
-      {#if sel.protected}
-        <p class="faint">Locked: the lead vocal, the bass and the kit stay where the artist put them.</p>
-      {:else}
-        <label class="field-label" for="height">Height <span class="value">{Math.round(sel.el)} degrees</span></label>
-        <input id="height" type="range" min="-20" max="80" step="5" value={sel.el} style:--fill={`${((sel.el + 20) / 100) * 100}%`}
-          oninput={(e) => update(sel!.name, { el: Number((e.currentTarget as HTMLInputElement).value) })} />
-      {/if}
-    </div>
-  {/if}
-
-  <button class="btn primary rerender" type="button" disabled={busy} onclick={onrerender}>
-    <Icon name="refresh" /> {busy ? "Rendering" : "Re-render with this stage"}
-  </button>
 </div>
 
 <style>
   .stage {
+    padding: var(--gap-4);
     display: grid;
-    gap: var(--gap-4);
+    gap: var(--gap-3);
   }
-
   canvas {
     display: block;
-    touch-action: none;
-    border-radius: var(--radius-md);
-    background: radial-gradient(80% 70% at 50% 58%, rgb(31 200 180 / 0.08), transparent 70%);
+    margin: 0 auto;
+    max-width: 100%;
   }
-
   .legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+    list-style: none;
     margin: 0;
     padding: 0;
-    list-style: none;
-  }
-
-  .legend button {
-    display: inline-flex;
-    align-items: center;
+    display: grid;
     gap: 6px;
-    min-height: 32px;
-    padding: 0 10px;
-    border-radius: var(--radius-pill);
-    border: 1px solid var(--hairline);
-    background: transparent;
-    font-size: var(--text-xs);
-    cursor: pointer;
+    font-size: var(--text-sm);
   }
-
-  .legend button.on {
-    background: rgb(244 241 234 / 0.1);
+  li {
+    display: grid;
+    grid-template-columns: 12px 1fr auto;
+    align-items: center;
+    gap: var(--gap-3);
   }
-
-  .swatch {
+  .dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
   }
-
-  .selected {
-    padding: var(--gap-4);
-    border-radius: var(--radius-md);
-    display: grid;
-    gap: var(--gap-2);
-    font-size: var(--text-sm);
+  .dot.ret {
+    background: #8a8f98;
+    opacity: 0.5;
   }
-
-  .rerender {
-    width: 100%;
+  .w {
+    color: var(--text-2);
+    font-size: var(--text-xs);
   }
 </style>
