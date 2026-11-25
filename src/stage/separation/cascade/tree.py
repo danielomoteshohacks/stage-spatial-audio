@@ -290,7 +290,7 @@ class Cascade:
 
     # -- the run ---------------------------------------------------------------------------------
     def run(self, mix: NDArray, sr: int, fallback_stems: dict[str, NDArray] | None = None,
-            refine: bool | None = None) -> CascadeResult:
+            refine: bool | None = None, quality: bool = True) -> CascadeResult:
         if refine is None:
             refine = bool(self.preset.get("refine", True))
         mix = np.asarray(mix, dtype=np.float32)
@@ -323,7 +323,11 @@ class Cascade:
             parts = self._timed("post", lambda: _chunked_refine(
                 mix, parts, lambda m, p: post.mixture_consistency(
                     m, post.multichannel_wiener(m, p, iterations=2)), sr))
-        quality = post.leaf_quality({k: v for k, v in parts.items() if "~" not in k}, mix)
+        # The leaf quality estimate is most of the cascade's CPU time (7 of 8 s on a 20 s chunk).
+        # It only drives merging, which needs it on every chunk, and the report, which needs it
+        # once; a streamed job asks for it on its first chunk only.
+        quality = (post.leaf_quality({k: v for k, v in parts.items() if "~" not in k}, mix)
+                   if (quality or refine) else {})
         merged_map: dict[str, str] = {}
         if refine:
             keep, merged_map = post.merge_poor_leaves(

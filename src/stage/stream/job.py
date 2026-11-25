@@ -146,7 +146,7 @@ def make_cascade_provider(preset: str, engines: dict | None, cache_dir: Path | N
     (one model load, no edge effects between chunks)."""
     from stage.separation.cascade.tree import Cascade
 
-    state: dict[str, Any] = {"whole": None, "error": None}
+    state: dict[str, Any] = {"whole": None, "error": None, "calls": 0}
 
     def prepare(audio: NDArray, sr: int) -> None:
         if separator is None:
@@ -176,7 +176,8 @@ def make_cascade_provider(preset: str, engines: dict | None, cache_dir: Path | N
                 leaves, ret, info = lite_leaves(audio, sr)
                 info["separator_error"] = f"{type(exc).__name__}: {exc}"
                 return leaves, ret, info
-        res = casc.run(audio, sr, fallback_stems=fallback)
+        state["calls"] += 1
+        res = casc.run(audio, sr, fallback_stems=fallback, quality=state["calls"] == 1)
         info = {"provider": f"cascade:{preset}", "report": res.report, "roles": res.roles,
                 "quality": {k: q.as_dict() for k, q in res.quality.items()},
                 "separator": state.get("model")}
