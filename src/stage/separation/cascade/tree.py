@@ -38,7 +38,11 @@ from stage.separation.cascade import adress, dereverb, dsp, post
 from stage.separation.cascade import config as cfg
 
 LEAD_ROLES = {"lead": "lead_vocal", "backing": "backing_vocal", "guitar": "guitar", "piano": "keys",
-              "other": "pad", "bass": "bass", "kick": "kick", "snare": "snare", "toms": "toms",
+              # "other" is everything a four- or six-stem model does not name: in most songs the
+              # chords, keys, guitars and synths, the harmonic body of the record. Labelled "pad"
+              # it was sent behind and above the listener (130 degrees, 30 up), which is what made
+              # the spatial version sound hollow and worse than stereo (decision 0032).
+              "other": "other", "bass": "bass", "kick": "kick", "snare": "snare", "toms": "toms",
               "hats": "cymbals", "cymbals": "cymbals"}
 DEREVERB_STEMS = ("lead", "backing", "guitar", "piano", "other")
 SPLIT_STEMS = ("backing", "guitar", "piano", "other")

@@ -137,13 +137,13 @@
     },
     "other": {
       "mode": "pair",
-      "az": 85,
-      "el": 10,
+      "az": 70,
+      "el": 5,
       "dist": 2.1,
       "protected": false,
       "breathes": true,
       "gain_db": 0,
-      "why": "Anything unclassified: wide at the sides."
+      "why": "Everything a separator does not name (in most songs the chords, keys, guitars and synths: the harmonic body of the record). It stays in front of the listener and opens to the sides, like a wide pair of speakers; sending it behind made the render hollow (decision 0032)."
     }
   },
   "single_side": {
@@ -153,7 +153,7 @@
     "keys": 40,
     "cymbals": 30,
     "toms": 50,
-    "other": 88
+    "other": 65
   },
   "returns": {
     "side": 0.3,

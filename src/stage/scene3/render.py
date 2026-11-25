@@ -181,6 +181,17 @@ def _filter(space: str, sr: int, az: float, el: float, dist: float, directional_
     return _trim(b.direct + b.early if early else b.direct, 0.1, sr)
 
 
+@lru_cache(maxsize=16)
+def _centre_filter(space: str, sr: int, head: str) -> NDArray[np.float32]:
+    """A flat, equal impulse in both ears at the time and energy of the head filter straight
+    ahead, so the untouched centre lines up with the sides rendered through head filters."""
+    ref = _filter(space, sr, 0.0, 0.0, 1.5, 0.0, head, False)
+    h = np.zeros_like(ref)
+    at = int(np.argmax(np.abs(ref).sum(axis=0)))
+    h[:, at] = float(np.sqrt(np.mean(np.sum(ref.astype(np.float64) ** 2, axis=1))))
+    return h
+
+
 def render_v3(audio: NDArray, sample_rate: int, plan: dict[str, Any],
               leaves: dict[str, NDArray], returns: dict[str, NDArray] | None = None,
               export_bed: bool = False, directional_db: float = 0.0, want_objects: bool = True,
@@ -217,6 +228,7 @@ def render_v3(audio: NDArray, sample_rate: int, plan: dict[str, Any],
     # Gather every source: static ones go to the batched convolver, moving ones are rendered
     # block by block.
     feeds: list[tuple[int, NDArray, tuple, NDArray]] = []  # object index, signal, key, filter
+    centre_record = plan.get("centre", "record") == "record"
     moving_out: dict[int, NDArray] = {}
     moving = 0
     names = [o["name"] for o in plan["stems"]]
@@ -257,7 +269,18 @@ def render_v3(audio: NDArray, sample_rate: int, plan: dict[str, Any],
             src_sig = (mono if f["ch"] == "M" else parts[f["ch"]] if f["ch"] in ("C", "Ls", "Rs")
                        else high[0 if f["ch"] == "L" else 1])
             sig = (gain * src_sig).astype(np.float32)
-            if dynamic and (np.ptp(paths[i][0]) > 0.5 or np.ptp(paths[i][1]) > 0.5):
+            still = not (dynamic and (np.ptp(paths[i][0]) > 0.5 or np.ptp(paths[i][1]) > 0.5))
+            if (centre_record and still and f["ch"] in ("C", "M")
+                    and abs(float(f["az"])) < 1.0 and abs(float(f["el"])) <= 15.0):
+                # The record's centre, as the record has it (decision 0032): the vocal, the kick
+                # and snare and whatever else was mixed to the middle reach both ears at once,
+                # exactly as in the stereo mix, with no head filter on them. Only what was beside
+                # the listener in the mix is moved around them.
+                feeds.append((oi, sig, ("record-centre", sr, head),
+                              _centre_filter(space, sr, head)))
+                bed.add(sig, 0.0, 0.0)
+                continue
+            if not still:
                 az_b, el_b = paths[i]
                 y = render_path(sig, az_b, el_b, dist, hs, directional_db).astype(np.float32)
                 moving_out[oi] = moving_out.get(oi, 0.0) + y
