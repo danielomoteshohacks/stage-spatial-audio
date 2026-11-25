@@ -106,11 +106,29 @@ jobs:
           print("profiles:", profiles)
           assert "space:studio" in profiles, profiles
           print(f"{host} is live with the v2 engine")
+          # The web app talks to the v3 routes, not only to Gradio. On the Space these once
+          # answered with the Gradio page while the deploy still passed, so check them as JSON,
+          # with CORS for a browser on another domain.
+          for path in ("/v3/health", "/catalog/shelves"):
+              req = urllib.request.Request(f"{host}{path}", headers={
+                  "Authorization": f"Bearer {os.environ['HF_TOKEN']}",
+                  "Origin": "https://soundstage-phi.vercel.app", "Accept": "application/json"})
+              with urllib.request.urlopen(req, timeout=60) as resp:
+                  body = resp.read()
+                  cors = resp.headers.get("access-control-allow-origin")
+              try:
+                  data = json.loads(body)
+              except ValueError:
+                  raise SystemExit(f"{path} answered with a page, not JSON: {body[:120]!r}")
+              assert cors in ("*", "https://soundstage-phi.vercel.app"), f"{path}: no CORS ({cors})"
+              summary = (data.get("engine") if path == "/v3/health"
+                         else f"{len(data.get('shelves', []))} shelves")
+              print(f"{path}: JSON, CORS {cors}, {summary}")
           PY
       # A Space that crashes on start used to leave only "RUNTIME_ERROR" here (three pushes in a
       # row, docs/log.md v3 Phase 6). Print what the Space itself says, so the cause is in this log.
-      - name: Show the Space's own logs after a failed deploy
-        if: failure() && steps.config.outputs.enabled == 'true'
+      - name: Show the Space's own logs
+        if: always() && steps.config.outputs.enabled == 'true'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE: ${{ vars.HF_SPACE }}
