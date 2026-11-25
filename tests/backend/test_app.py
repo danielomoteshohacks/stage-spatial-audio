@@ -24,7 +24,7 @@ def app():
 def test_the_api_endpoints_are_process_rerender_and_v3(app):
     names = [d.api_name for d in app.demo.fns.values()
              if d.api_name and getattr(d, "api_visibility", "public") != "private"]
-    assert names == ["process", "rerender", "v3_process"]
+    assert names == ["process", "rerender", "v3_process", "v3_catalog"]
 
 
 def test_profile_choices_cover_every_profile(app):

@@ -563,3 +563,35 @@ model-free leaves. Table in decision 0027. 25 new tests: seams, codec joints, wh
 ### Next
 
 Phase 4: the streaming catalogue.
+
+## 2026-11-25: v3 Phase 4, the streaming catalogue
+
+### Done
+
+- `stage.catalogue` (licence policy, sources, shelf builder, store, audio fetch), the backend
+  routes (shelves, search, genre, artist, track, audio proxy, legal, render from the catalogue),
+  the harvest and pre-render scripts, the weekly `catalogue` workflow, the seed (decision 0028).
+
+### Measured
+
+115 tracks, every audio URL verified, 33 CC BY and 82 CC BY-SA of several versions, 11 shelves
+(8 to 14 tracks each), at most two per artist. 17 new tests (licences, sources, placement, store,
+the seed's own promise: at least 60 tracks, no NC or ND, every URL checked, 90 to 480 s).
+
+### What went wrong
+
+- The first harvest placed tracks by search hit: a darkwave track called "Gospel of Wealth" on the
+  gospel shelf, "Classic Rock CDs In A Giant Bonfire" on the classical one. Placement now needs the
+  track's own genre tag and honours per-shelf exclusions.
+- Only Jamendo came back: Openverse's other audio sources gave nothing for music under the licence
+  filter, and the Internet Archive's audio hosts are not reachable from here, so its tracks could
+  not be verified. The catalogue is broad in genres, narrow in sources.
+- Openverse answers some queries with a 500; the builder keeps going and the seed is whatever the
+  working queries returned.
+- The pre-rendered dataset does not exist: no Hugging Face write token in this environment.
+- The Jamendo API could not be tried: there is no client id here. It is coded against its
+  documented fields and tested on recorded-shape responses only.
+
+### Next
+
+Phase 5: the product.

@@ -1,0 +1,307 @@
+{
+  "_about": "The shelves of the streaming catalogue (decision 0028). Each shelf is a list of search terms sent to the sources and a list of genre tags that place a track on it; a track lands on every shelf whose tags it carries, then the shelf is trimmed to `max` with at most `per_artist` tracks by one artist. `made_for_spatial` is not searched: it is filled from tracks whose own analysis (stereo width and number of separable parts) is highest, and until that analysis has run, from the genres that tend to carry wide, layered arrangements. A track is placed on a shelf only when one of its own genre tags is in the shelf's `tags` and none is in `exclude`; a track with no genre tags is placed by its title and the search term that found it (a title that contains the term). Search terms alone are not enough: a title with the word 'house' or 'soul' in it is not necessarily house or soul.",
+  "min_duration_s": 90,
+  "max_duration_s": 480,
+  "per_artist": 2,
+  "shelves": {
+    "afrobeats": {
+      "title": "Afrobeats and Afro-fusion",
+      "max": 14,
+      "terms": [
+        "afrobeat",
+        "afrobeats",
+        "afro",
+        "highlife",
+        "african",
+        "afropop",
+        "afrofusion"
+      ],
+      "tags": [
+        "afrobeat",
+        "afrobeats",
+        "african",
+        "afro",
+        "highlife",
+        "afropop",
+        "world"
+      ],
+      "exclude": [
+        "metal",
+        "heavymetal",
+        "deathmetal",
+        "punk",
+        "hardcore",
+        "industrial"
+      ]
+    },
+    "amapiano": {
+      "title": "Amapiano and South African house",
+      "max": 8,
+      "terms": [
+        "amapiano",
+        "gqom",
+        "kwaito",
+        "south african house",
+        "deep house"
+      ],
+      "tags": [
+        "amapiano",
+        "gqom",
+        "kwaito",
+        "deephouse",
+        "deep house"
+      ],
+      "exclude": [
+        "metal",
+        "rock",
+        "punk",
+        "country"
+      ]
+    },
+    "hiphop": {
+      "title": "Hip-hop",
+      "max": 12,
+      "terms": [
+        "hip hop",
+        "hiphop",
+        "rap",
+        "trap",
+        "boom bap",
+        "beats"
+      ],
+      "tags": [
+        "hiphop",
+        "hip hop",
+        "rap",
+        "trap",
+        "urban",
+        "beats"
+      ],
+      "exclude": [
+        "metal",
+        "heavymetal",
+        "deathmetal",
+        "thrashmetal",
+        "hardcore",
+        "punk",
+        "rock"
+      ]
+    },
+    "rnb_soul": {
+      "title": "R&B and soul",
+      "max": 12,
+      "terms": [
+        "rnb",
+        "soul",
+        "neo soul",
+        "funk",
+        "groove"
+      ],
+      "tags": [
+        "rnb",
+        "soul",
+        "funk",
+        "neosoul",
+        "motown"
+      ],
+      "exclude": [
+        "metal",
+        "heavymetal",
+        "industrial",
+        "hardrock",
+        "punk",
+        "darkambient",
+        "electronica"
+      ]
+    },
+    "gospel": {
+      "title": "Gospel and worship",
+      "max": 8,
+      "terms": [
+        "gospel",
+        "worship",
+        "spiritual",
+        "christian",
+        "praise"
+      ],
+      "tags": [
+        "gospel",
+        "worship",
+        "christian",
+        "spiritual",
+        "religious"
+      ],
+      "exclude": [
+        "metal",
+        "heavymetal",
+        "progressivemetal",
+        "industrial",
+        "darkwave",
+        "darkambient",
+        "drone",
+        "hardrock",
+        "hiphop"
+      ]
+    },
+    "house_electronic": {
+      "title": "House and electronic",
+      "max": 14,
+      "terms": [
+        "house",
+        "electro",
+        "techno",
+        "edm",
+        "trance",
+        "electronic dance"
+      ],
+      "tags": [
+        "house",
+        "electronic",
+        "electro",
+        "techno",
+        "dance",
+        "edm",
+        "trance",
+        "dubstep"
+      ],
+      "exclude": [
+        "metal",
+        "country",
+        "bluegrass",
+        "blues",
+        "folk",
+        "soul",
+        "rnb",
+        "indie"
+      ]
+    },
+    "lofi": {
+      "title": "Lo-fi and chill",
+      "max": 12,
+      "terms": [
+        "lofi",
+        "lo-fi",
+        "chillhop",
+        "downtempo",
+        "chillout",
+        "chill"
+      ],
+      "tags": [
+        "lofi",
+        "chillhop",
+        "downtempo",
+        "chillout",
+        "chill",
+        "trip hop",
+        "triphop",
+        "lounge"
+      ],
+      "exclude": [
+        "metal",
+        "hardrock",
+        "punk",
+        "psychedelicrock",
+        "rock"
+      ]
+    },
+    "cinematic": {
+      "title": "Cinematic",
+      "max": 12,
+      "terms": [
+        "cinematic",
+        "soundtrack",
+        "epic",
+        "film score",
+        "orchestral trailer"
+      ],
+      "tags": [
+        "cinematic",
+        "soundtrack",
+        "filmscore",
+        "epic",
+        "trailer",
+        "score"
+      ],
+      "exclude": [
+        "metal",
+        "hardcore",
+        "punk",
+        "hiphop"
+      ]
+    },
+    "acoustic": {
+      "title": "Acoustic",
+      "max": 12,
+      "terms": [
+        "acoustic",
+        "folk",
+        "singer songwriter",
+        "guitar",
+        "unplugged"
+      ],
+      "tags": [
+        "acoustic",
+        "folk",
+        "singersongwriter",
+        "singer-songwriter",
+        "country",
+        "guitar"
+      ],
+      "exclude": [
+        "metal",
+        "darkambient",
+        "industrial",
+        "electronic",
+        "hardrock",
+        "medieval"
+      ]
+    },
+    "classical": {
+      "title": "Classical",
+      "max": 12,
+      "terms": [
+        "classical",
+        "piano",
+        "string quartet",
+        "symphony",
+        "chamber"
+      ],
+      "tags": [
+        "classical",
+        "piano",
+        "orchestral",
+        "baroque",
+        "chamber",
+        "symphonic"
+      ],
+      "exclude": [
+        "metal",
+        "rock",
+        "hiphop",
+        "disco",
+        "synthpop",
+        "breakbeat",
+        "drumnbass",
+        "pop",
+        "rnb",
+        "trance"
+      ]
+    },
+    "made_for_spatial": {
+      "title": "Made for spatial",
+      "max": 12,
+      "terms": [],
+      "tags": [
+        "ambient",
+        "cinematic",
+        "orchestral",
+        "electronic",
+        "world",
+        "newage",
+        "new age",
+        "psychedelic",
+        "progressive"
+      ]
+    }
+  }
+}

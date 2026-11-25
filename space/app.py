@@ -174,6 +174,10 @@ def _v3_event(audio_file, options_json=""):
     yield from v3_process(audio_file, options_json)
 
 
+def _v3_catalog_event(track_id, options_json=""):
+    yield from v3_catalog(track_id, options_json)
+
+
 def build() -> gr.Blocks:
     genres = [("auto (tagger)", "auto")] + [(t["label"], name) for name, t in templates().items()]
     with gr.Blocks(title="SoundStage backend", delete_cache=(600, int(DEFAULT_TTL_S))) as demo:
@@ -228,6 +232,10 @@ def build() -> gr.Blocks:
             v3_out = gr.Textbox(label="Job state (JSON)")
             gr.Button("Start v3 job").click(_v3_event, [v3_file, v3_opts], [v3_out],
                                             api_name="v3_process", concurrency_limit=1)
+            v3_track = gr.Textbox(label="Catalogue track id")
+            gr.Button("Render a catalogue track").click(
+                _v3_catalog_event, [v3_track, v3_opts], [v3_out], api_name="v3_catalog",
+                concurrency_limit=1)
     # One job at a time: a render holds whole-signal arrays, and the GPU quota is per visitor.
     demo.queue(default_concurrency_limit=1, max_size=16)
     return demo
@@ -271,6 +279,35 @@ def v3_process(audio_file, options_json=""):
         yield json.dumps(j.snapshot())
 
 
+from stage.catalogue.fetch import FetchRefused, download, suffix_for  # noqa: E402
+from stage.catalogue.store import Catalogue  # noqa: E402
+from stage.server.catalog import create_catalog_router  # noqa: E402
+
+CATALOGUE = Catalogue()
+
+
+def v3_catalog(track_id, options_json=""):
+    """Render a catalogue track on demand: the server downloads it, so nothing is uploaded."""
+    t = CATALOGUE.track(str(track_id or ""))
+    if t is None:
+        yield json.dumps({"done": True, "error": "That track is not in the catalogue."})
+        return
+    try:
+        opts = parse_options(options_json)
+        job = new_job(STORE.root, opts)
+        dest = job.dir / f"source{suffix_for(t)}"
+        download(t, dest)
+        readable, duration, notes = validate_upload(dest, job.dir)
+    except (ValueError, TypeError, ValidationError, FetchRefused) as exc:
+        yield json.dumps({"done": True, "error": f"The track could not be prepared: {exc}"})
+        return
+    job.update(notes=notes, source_duration_s=round(duration, 2), track=t.as_dict())
+    with STORE.lock:
+        STORE.jobs[job.id] = job
+    for j in iter_job(job, readable, _provider_for(opts.preset)):
+        yield json.dumps(j.snapshot())
+
+
 def build_app():
     """The Gradio demo plus the v3 HTTP routes, with CORS so the web app can fetch segments."""
     from fastapi import FastAPI
@@ -280,6 +317,7 @@ def build_app():
     api.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"],
                        allow_headers=["*"])
     api.include_router(_router)
+    api.include_router(create_catalog_router(CATALOGUE, STORE, background=False))
     return gr.mount_gradio_app(api, demo, path="/", allowed_paths=[str(WORK_ROOT)])
 
 def fetch_assets() -> None:
@@ -314,6 +352,7 @@ if __name__ == "__main__":
     WORK_ROOT.mkdir(parents=True, exist_ok=True)
     start_sweeper()
     fetch_assets()
+    CATALOGUE.refresh_in_background()
     import uvicorn
 
     uvicorn.run(build_app(), host=os.getenv("GRADIO_SERVER_NAME", "0.0.0.0"),
