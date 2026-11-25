@@ -253,7 +253,10 @@ from stage.server.providers import default_provider_factory  # noqa: E402
 from stage.service import ValidationError, validate_upload  # noqa: E402
 from stage.stream.job import iter_job, new_job  # noqa: E402
 
-GPU_JOB_S = 120
+# One whole-song separation per job now (stage.stream.job.make_cascade_provider). ZeroGPU
+# reserves the requested duration from the visitor's daily quota, so ask for what htdemucs needs
+# for a long song on the Space's GPU, not more: two minutes would allow only two songs a day.
+GPU_JOB_S = 60
 _gpu = (lambda fn: spaces.GPU(duration=GPU_JOB_S)(fn)) if spaces is not None else None
 _router, STORE = create_router(JobStore(WORK_ROOT), background=False)
 _provider_for = default_provider_factory(_gpu)

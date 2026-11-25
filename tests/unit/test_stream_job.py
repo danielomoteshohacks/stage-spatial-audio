@@ -107,3 +107,51 @@ def test_model_free_leaves_when_there_is_no_separator(song_file, tmp_path):
     st = job.snapshot()
     assert st["status"] == "done", st.get("error")
     assert st["run"]["providers"][0]["provider"].startswith("model-free")
+
+
+def test_the_separator_runs_once_over_the_whole_song(song_file, tmp_path):
+    """One GPU call per song: per-chunk calls each reserved quota on ZeroGPU and the job failed
+    after two chunks once the quota ran out."""
+    from types import SimpleNamespace
+
+    song, path = song_file
+    calls = []
+
+    def separator(audio, sr):
+        calls.append(audio.shape[1])
+        return SimpleNamespace(stems=song.four_stems(), model="oracle")
+
+    job = new_job(tmp_path, JobOptions(preset="cpu", chunk_s=6.0, first_s=3.0, overlap_s=0.5))
+    run_job(job, path, provider=make_cascade_provider("cpu", {}, None, separator))
+    st = job.snapshot()
+    assert st["status"] == "done", st.get("error")
+    assert calls == [song.mix.shape[1]]
+    assert st["chunks_total"] >= 3
+
+
+def test_a_failing_separator_still_renders_the_whole_song(song_file, tmp_path):
+    """When separation fails (no quota, no model), every chunk uses the model-free leaves and no
+    chunk loses its audio, even though those leaves have other names than a separator's."""
+    song, path = song_file
+
+    def separator(audio, sr):
+        raise RuntimeError("ZeroGPU quota exceeded")
+
+    job = new_job(tmp_path, JobOptions(preset="cpu", chunk_s=6.0, first_s=3.0, overlap_s=0.5))
+    run_job(job, path, provider=make_cascade_provider("cpu", {}, None, separator))
+    st = job.snapshot()
+    assert st["status"] == "done", st.get("error")
+    full, _ = sf.read(str(job.dir / "spatial.flac"), dtype="float32", always_2d=True)
+    hop = full.shape[0] // 8
+    rms = [float(np.sqrt(np.mean(full[i : i + hop] ** 2))) for i in range(0, hop * 8, hop)]
+    assert min(rms[:-1]) > 1e-3, rms  # no silent stretch
+
+
+def test_route_leaves_never_drops_a_leaf():
+    from stage.stream.job import route_leaves
+
+    plan = {"stems": [{"kind": "object", "leaf": "vocals", "role": "lead_vocal", "protected": True},
+                      {"kind": "object", "leaf": "other", "role": "pad"}]}
+    x = np.ones((2, 8), np.float32)
+    out = route_leaves({"mystery_leaf": x, "vocals": x}, plan)
+    assert set(out) == {"other", "vocals"}

@@ -136,12 +136,39 @@ def lite_leaves(audio: NDArray, sr: int) -> tuple[dict, dict, dict]:
 
 def make_cascade_provider(preset: str, engines: dict | None, cache_dir: Path | None,
                           separator: Callable | None) -> Provider:
+    """The cascade over a separator's stems.
+
+    The separator runs ONCE over the whole song (`prepare`), and each chunk then takes its slice
+    of those stems. Separating chunk by chunk asked the GPU for a fresh allocation per chunk: on a
+    ZeroGPU Space each request reserves its full duration from the visitor's small daily quota, so
+    a five-minute song ran out of quota after two chunks, the later chunks fell back to the
+    model-free leaves under other names, and the job failed. One whole-song call is also faster
+    (one model load, no edge effects between chunks)."""
     from stage.separation.cascade.tree import Cascade
 
-    def provide(audio: NDArray, sr: int) -> tuple[dict, dict, dict]:
+    state: dict[str, Any] = {"whole": None, "error": None}
+
+    def prepare(audio: NDArray, sr: int) -> None:
+        if separator is None:
+            return
+        try:
+            sep = separator(audio.astype(np.float64), sr)
+            state["whole"] = {k: np.asarray(v, dtype=np.float32) for k, v in sep.stems.items()}
+            state["model"] = getattr(sep, "model", None)
+        except Exception as exc:  # recorded; every chunk then uses the model-free leaves
+            state["error"] = f"{type(exc).__name__}: {exc}"
+
+    def provide(audio: NDArray, sr: int, span: tuple[int, int] | None = None
+                ) -> tuple[dict, dict, dict]:
         casc = Cascade(preset, engines=engines or {}, cache_dir=cache_dir)
         fallback = None
-        if separator is not None:
+        if state["whole"] is not None and span is not None:
+            fallback = {k: v[:, span[0] : span[1]] for k, v in state["whole"].items()}
+        elif state["error"] is not None:
+            leaves, ret, info = lite_leaves(audio, sr)
+            info["separator_error"] = state["error"]
+            return leaves, ret, info
+        elif separator is not None:
             try:
                 sep = separator(audio.astype(np.float64), sr)
                 fallback = {k: np.asarray(v, dtype=np.float32) for k, v in sep.stems.items()}
@@ -151,9 +178,11 @@ def make_cascade_provider(preset: str, engines: dict | None, cache_dir: Path | N
                 return leaves, ret, info
         res = casc.run(audio, sr, fallback_stems=fallback)
         info = {"provider": f"cascade:{preset}", "report": res.report, "roles": res.roles,
-                "quality": {k: q.as_dict() for k, q in res.quality.items()}}
+                "quality": {k: q.as_dict() for k, q in res.quality.items()},
+                "separator": state.get("model")}
         return res.leaves, res.reverb, info
 
+    provide.prepare = prepare  # type: ignore[attr-defined]
     return provide
 
 
@@ -167,9 +196,12 @@ def route_leaves(leaves: dict[str, NDArray], plan: dict[str, Any]) -> dict[str, 
         if name not in known:
             role = infer_role(name)
             same = [o["leaf"] for o in known.values() if o["role"] == role]
-            if not same:
+            # Never drop audio: a leaf with no object of its role goes to the plan's largest
+            # unprotected object (or any object), so an instrument is never silently missing.
+            others = [o["leaf"] for o in known.values() if not o.get("protected")] or list(known)
+            if not same and not others:
                 continue
-            target = same[0]
+            target = same[0] if same else others[0]
         out[target] = out[target] + x if target in out else x
     return out
 
@@ -221,6 +253,13 @@ def iter_job(job: Job, audio_path: Path, provider: Provider | None = None,
         job.update(chunks_total=len(spans), tempo_bpm=round(analysis.tempo_bpm, 2),
                    genre=genre_info["genre"])
         provide = provider or (lambda a, s: lite_leaves(a, s))
+        prepare = getattr(provide, "prepare", None)
+        if prepare is not None:
+            job.update(stage="separate")
+            yield job
+            t = time.perf_counter()
+            prepare(audio, sr)
+            timings["separate_whole"] = time.perf_counter() - t
         asm = Assembler(n, int(opt.overlap_s * sr))
         out = np.zeros((2, n), dtype=np.float32)
         plan: dict[str, Any] | None = None
@@ -236,7 +275,8 @@ def iter_job(job: Job, audio_path: Path, provider: Provider | None = None,
             yield job
             a0, a1 = max(0, span.start - ctx), min(n, span.end + ctx)
             t = time.perf_counter()
-            leaves_c, returns_c, info = provide(audio[:, a0:a1], sr)
+            leaves_c, returns_c, info = (provide(audio[:, a0:a1], sr, span=(a0, a1))
+                                         if prepare is not None else provide(audio[:, a0:a1], sr))
             lo, hi = span.start - a0, span.start - a0 + (span.end - span.start)
             leaves = {k: np.asarray(v, dtype=np.float32)[:, lo:hi] for k, v in leaves_c.items()}
             returns = {k: np.asarray(v, dtype=np.float32)[:, lo:hi] for k, v in returns_c.items()}

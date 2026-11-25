@@ -121,8 +121,8 @@ def detect_events(leaves: dict[str, NDArray], sample_rate: int, beats_s: list[fl
             if e[g[-third:]].mean() - e[g[:third]].mean() >= 6.0:
                 add_riser(g[0] * hop_s, g[-1] * hop_s)
                 riser_spans.append((g[0] * hop_s, g[-1] * hop_s))
-    if not fx_names:
-        total = sum(leaves.values())
+    if not fx_names and leaves:
+        total = np.sum(np.stack(list(leaves.values())), axis=0)
         env = envelope_db(total, sample_rate, hop_s, above_hz=3000.0)
         smooth = np.convolve(env, np.ones(6) / 6, mode="same")
         bar = 4 * beat
