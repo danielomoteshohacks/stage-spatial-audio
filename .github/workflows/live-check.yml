@@ -86,5 +86,10 @@ jobs:
               seg = r.read()
           print("segment bytes:", len(seg), seg[:4])
           assert len(seg) > 1000
+          run = last.get("run") or {}
+          print("timings:", run.get("timings_s"), "rtf:", run.get("rtf"), "render rtf:", run.get("render_rtf"))
+          print("separator:", [p.get("separator") or p.get("separator_error") or p.get("provider")
+                               for p in run.get("providers", [])])
+          print("guard:", run.get("guard"))
           print(f"whole job: {time.time() - t0:.1f} s")
           PY
